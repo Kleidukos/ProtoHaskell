@@ -1,0 +1,176 @@
+cabal-version:      3.6
+
+-- This file has been generated from package.yaml by hpack version 0.35.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: d1b805c36a026c1fda3917546e854f9bf651c2cbee8d6a554ee634440d8eb9c8
+
+name:               ProtoHaskell
+version:            0.1.0.0
+license-file:       LICENSE
+build-type:         Simple
+extra-source-files:
+  ChangeLog.md
+  README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/JKTKops/ProtoHaskell
+
+library
+  exposed-modules:
+    Compiler.BasicTypes.FastString
+    Compiler.BasicTypes.Name
+    Compiler.BasicTypes.OccName
+    Compiler.BasicTypes.ParsedName
+    Compiler.BasicTypes.SrcLoc
+    Compiler.BasicTypes.Unique
+    Compiler.BasicTypes.UniqueMap
+    Compiler.Messages
+    Compiler.Parser.Errors
+    Compiler.Parser.Helpers
+    Compiler.Parser.Lexer
+    Compiler.Parser.MegaParser
+    Compiler.Parser.Parser
+    Compiler.Parser.Pattern
+    Compiler.PhSyn.PhExpr
+    Compiler.PhSyn.PhSyn
+    Compiler.PhSyn.PhType
+    Compiler.Renamer
+    Compiler.Settings
+    Compiler.TypeChecker
+    Control.Monad.IOEnv
+    Control.Monad.Supply
+    Control.Monad.Supply.Class
+    Control.Panic
+    Data.Bag
+    Utils.MonadUtils
+    Utils.Outputable
+
+  other-modules:      Paths_ProtoHaskell
+  hs-source-dirs:     src
+  build-tool-depends:
+    , alex:alex    ^>=3.2
+    , happy:happy  ^>=1.20
+
+  default-extensions:
+    ApplicativeDo
+    BangPatterns
+    DerivingStrategies
+    FlexibleInstances
+    FunctionalDependencies
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedRecordDot
+    OverloadedStrings
+    PatternGuards
+    TupleSections
+    ViewPatterns
+
+  build-depends:
+    , array
+    , base                         >=4.7 && <5
+    , containers
+    , directory
+    , effectful-core
+    , filepath
+    , megaparsec
+    , mtl
+    , multiset
+    , parsec
+    , pretty-simple
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , text
+    , text-display
+    , vector
+
+  default-language:   GHC2021
+
+executable phc
+  main-is:            Main.hs
+  other-modules:      Paths_ProtoHaskell
+  hs-source-dirs:     app
+  default-extensions:
+    ApplicativeDo
+    BangPatterns
+    FlexibleInstances
+    FunctionalDependencies
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedStrings
+    PatternGuards
+    TupleSections
+    ViewPatterns
+
+  ghc-options:        -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+    , array
+    , base                         >=4.7 && <5
+    , containers
+    , directory
+    , filepath
+    , megaparsec
+    , mtl
+    , parsec
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , ProtoHaskell
+    , text
+
+  default-language:   GHC2021
+
+test-suite phc-test
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  other-modules:
+    Compiler.Parser.LexerTest
+    Compiler.Parser.ParserTest
+    Compiler.RenamerTest
+    Test
+
+  hs-source-dirs:     test
+  default-extensions:
+    ApplicativeDo
+    BangPatterns
+    FlexibleInstances
+    FunctionalDependencies
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedStrings
+    PatternGuards
+    TupleSections
+    ViewPatterns
+    ViewPatterns
+
+  ghc-options:        -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+    , array
+    , base                         >=4.7 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , megaparsec
+    , mtl
+    , parsec
+    , pretty-simple
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , ProtoHaskell
+    , PyF
+    , tasty
+    , tasty-golden
+    , tasty-hunit
+    , text
+    , text-display
+    , utf8-string
+
+  default-language:   GHC2021
