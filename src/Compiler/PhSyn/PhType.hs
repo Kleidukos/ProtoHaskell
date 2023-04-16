@@ -12,8 +12,8 @@ data PhType id
     PhQualTy
       [Pred id] -- context (C in C => A)
       (LPhType id) -- payload (A in C => A)
-  | PhAppTy (LPhType id) (LPhType id)
-  | PhFunTy (LPhType id) (LPhType id)
+  | PhAppTy (LPhType id) (LPhType id) -- For higher-kinded types, for instance: PhAppTy IO ()
+  | PhFunTy (LPhType id) (LPhType id) -- Function types, so a -> b
   | PhListTy (LPhType id)
   | PhTupleTy [LPhType id]
   | PhParTy (LPhType id) -- parenthesized type

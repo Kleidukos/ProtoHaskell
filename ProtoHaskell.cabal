@@ -57,6 +57,7 @@ library
   default-extensions:
     ApplicativeDo
     BangPatterns
+    DataKinds
     DerivingStrategies
     FlexibleInstances
     FunctionalDependencies

@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 -- |
 -- The Renamer is tasked with:
 -- 1. Turning 'ParsedName's into 'Name's.
