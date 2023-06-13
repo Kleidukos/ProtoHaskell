@@ -21,9 +21,9 @@ regen-golden: ## Re-generate the golden tests
 
 lint: ## Run the code linter (HLint)
 	@find src -name "*.hs" | xargs -P $(PROCS) -I {} hlint --refactor-options="-i" --refactor {}
-	@cabal-fmt -i *.cabal
 
 style: ## Run the code styler (stylish-haskell)
+	@cabal-fmt -i *.cabal
 	@find src -name "*.hs" | xargs -P $(PROCS) -I {} fourmolu -q --mode inplace {}
 
 help:

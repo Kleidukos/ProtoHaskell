@@ -19,8 +19,10 @@ source-repository head
   location: https://github.com/JKTKops/ProtoHaskell
 
 library
+  -- cabal-fmt: expand src/
   exposed-modules:
     Compiler.BasicTypes.FastString
+    Compiler.BasicTypes.Location
     Compiler.BasicTypes.Name
     Compiler.BasicTypes.OccName
     Compiler.BasicTypes.ParsedName
