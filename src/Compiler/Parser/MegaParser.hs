@@ -10,8 +10,8 @@ import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.ParsedName
 import Compiler.BasicTypes.OccName
 
-import Utils.Outputable hiding (comma, semicolon)
-import qualified Utils.Outputable as O
+import Utils.Pretty hiding (comma, semicolon)
+import qualified Utils.Pretty as O
 
 import Data.Proxy
 import Data.Void

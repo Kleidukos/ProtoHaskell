@@ -1,8 +1,3 @@
-module
-
-{- {- some nested content
--}
-other content
--}
-
-foo bar
+[<indentation>, [, <, indentation, >, ,, [, ,, <, ,, indentation, ,, >, ,, ,, ,,
+ module, ,, ,, ,, <, ,, indentation, ,, >, ,, ,, ,, foo, ,, <indentation>, ,, ,,
+ bar, ,, ], ]]

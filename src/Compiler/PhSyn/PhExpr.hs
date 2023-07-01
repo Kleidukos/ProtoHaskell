@@ -5,7 +5,8 @@ import Data.Text (Text)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.PhSyn.PhType
 
-import Utils.Outputable
+import Prettyprinter
+import Utils.Output
 
 type LPhExpr id = Located (PhExpr id)
 data PhExpr id
@@ -31,7 +32,7 @@ data PhExpr id
   | ExplicitList [LPhExpr id]
   | ArithSeq (ArithSeqInfo id)
   | Typed (LPhType id) (LPhExpr id)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 mkLPhAppExpr :: LPhExpr id -> LPhExpr id -> LPhExpr id
 mkLPhAppExpr e1@(Located s1 _) e2@(Located s2 _) =
@@ -48,25 +49,25 @@ data MatchGroup id = MG
   { alternatives :: [LMatch id]
   , context :: MatchContext
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LMatch id = Located (Match id)
 data Match id = Match
-  { matchPats :: [LPat id]
+  { matchPats :: [Located id]
   , rhs :: LRHS id
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LRHS id = Located (RHS id)
 data RHS id = RHS
-  { grhs :: LGRHS id
+  { expr :: LPhExpr id
   , localBinds :: LPhLocalBinds id -- where clause
   -- There is technically a distinction between "no local bindings" and
   -- "empty local bindings", syntactically, but semantically they are the same.
   -- So the pretty-printer won't print them. Messages printed from source would
   -- still (obviously) see the empty local bindings.
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 {- NOTE: [GRHS]
 Called "guarded right hand sides" even if there are actually no guards
@@ -81,15 +82,9 @@ a GRHS uniformly later.
 -- have one GRHS per guard, which is shaped like GRHS [LGuardStmt] LPhExpr
 -- where LGuardStmt is just an LStmt (same as statements in a do-block, meaning distinguished
 -- by the context). Then RHS contains a [LGRHS] instead of just an LGRHS.
-type LGRHS id = Located (GuardedRHS id)
-data GuardedRHS id
-  = Unguarded (LPhExpr id)
-  | Guarded [LGuard id]
-  deriving (Eq, Ord, Show)
-
 type LGuard id = Located (Guard id)
 data Guard id = Guard (LPhExpr id) (LPhExpr id)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data MatchContext
   = FunCtxt
@@ -103,44 +98,42 @@ isCaseOrLamCtxt CaseCtxt = True
 isCaseOrLamCtxt LamCtxt = True
 isCaseOrLamCtxt _ = False
 
-type LPat id = Located (Pat id)
-
--- TODO: constructor for infix pattern, like x:xs or gexpr `Guard` body
--- Alternatively we could just let that fall under PCon.
-data Pat id
-  = PVar id
-  | PCon id [Pat id]
-  | PAs id (Pat id)
-  | PLit PhLit
-  | PWild
-  | PTuple [Pat id]
-  | PList [Pat id]
-  | ParPat (Pat id) -- Parenthesized pattern, see NOTE: [Par constructors in syn]
-  deriving (Eq, Ord, Show)
+-- type LPat id = Located (Pat id)
+--
+-- -- TODO: constructor for infix pattern, like x:xs or gexpr `Guard` body
+-- -- Alternatively we could just let that fall under PCon.
+-- data Pat id
+--   = PVar id
+--   | PCon id [Pat id]
+--   | PAs id (Pat id)
+--   | PLit PhLit
+--   | PWild
+--   | PTuple [Pat id]
+--   | PList [Pat id]
+--   | ParPat (Pat id) -- Parenthesized pattern, see NOTE: [Par constructors in syn]
+--   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LPhLocalBinds id = Located (PhLocalBinds id)
 data PhLocalBinds id = LocalBinds [LPhBind id] [LSig id]
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LPhBind id = Located (PhBind id)
 data PhBind id
   = -- | f x = e
     -- id = f, mg = ([PVar x], body = b)
     FunBind id (MatchGroup id)
-  | -- | Just x = e
-    -- Pattern bindings include x = 5
-    PatBind (LPat id) (LRHS id)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LStmt id = Located (Stmt id)
 data Stmt id
   = -- | exp
     SExpr (LPhExpr id)
-  | -- | pat <- exp
-    SGenerator (LPat id) (LPhExpr id)
-  | -- | let bindings
+  | -- \| let bindings
+
+    -- | -- | pat <- exp
+    --   SGenerator (LPat id) (LPhExpr id)
     SLet (LPhLocalBinds id)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- This will become more interesting if we implement TupleSections
 type LPhTupArg id = LPhExpr id
@@ -157,7 +150,7 @@ data ArithSeqInfo id
       (LPhExpr id)
       (LPhExpr id)
       (LPhExpr id)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 {- NOTE: [Par constructors in syn]
 
@@ -173,120 +166,122 @@ we simply ensure that we generate the correct PhPar wrappers.
 
 type LSig id = Located (Sig id)
 data Sig id
-  = TypeSig [id] (LPhType id)
-  deriving (Eq, Ord, Show)
+  = TypeSig id (LPhType id)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data Assoc = Infix | InfixL | InfixR deriving (Eq, Ord, Show, Enum, Bounded)
 
 ----------------------------------------------------------------------------------
--- Outputable instances
+-- Pretty instances
 ----------------------------------------------------------------------------------
 
-instance Outputable id => Outputable (PhExpr id) where
-  ppr (PhVar id) = ppr id
-  ppr (PhLit lit) = ppr lit
-  ppr (PhLam mg) = ppr mg
-  ppr (PhApp e1 e2) = asPrefixVar (ppr e1) <+> asPrefixVar (ppr e2)
-  ppr (OpApp e1 e2 e3) =
-    asPrefixVar (ppr e1)
-      <+> asInfixVar (ppr e2)
-      <+> asPrefixVar (ppr e3)
-  ppr (NegApp e) = text "-" <> ppr e
-  ppr (PhPar e) = parens $ ppr e
-  ppr (PhCase scrut mg) =
-    text "case"
-      <+> ppr scrut
-      <+> text "of"
-      $$ indent 2 (ppr mg)
-  ppr (PhIf p t f) =
-    text "if"
-      <+> ppr p
-      <+> text "then"
-      <+> ppr t
-      <+> text "else"
-      <+> ppr f
-  ppr (PhLet binds e) =
-    text "let"
-      <+> align (ppr binds)
-      $$ text "in"
-      <+> ppr e
-  ppr (PhDo stmts) = text "do" <+> align (vcat $ map ppr stmts)
-  ppr (ExplicitTuple tupArgs) = parens $ hcat $ punctuate comma $ map ppr tupArgs
-  ppr (ExplicitList elems) = brackets $ hsep $ punctuate comma $ map ppr elems
-  ppr (ArithSeq info) = brackets $ ppr info
-  ppr (Typed t e) = ppr e <+> dcolon <+> ppr t
+instance (Pretty id) => Pretty (PhExpr id) where
+  pretty (PhVar id) = pretty id
+  pretty (PhLit lit) = pretty lit
+  pretty (PhLam mg) = pretty mg
+  pretty (PhApp e1 e2) = asPrefixVar (pretty e1) <+> asPrefixVar (pretty e2)
+  pretty (OpApp e1 e2 e3) =
+    asPrefixVar (pretty e1)
+      <+> asInfixVar (pretty e2)
+      <+> asPrefixVar (pretty e3)
+  pretty (NegApp e) = pretty @Text "-" <> pretty e
+  pretty (PhPar e) = parens $ pretty e
+  pretty (PhCase scrut mg) =
+    pretty @Text "case"
+      <+> pretty scrut
+      <+> pretty @Text "of"
+      <+> indent 2 (pretty mg)
+  pretty (PhIf p t f) =
+    pretty @Text "if"
+      <+> pretty p
+      <+> pretty @Text "then"
+      <+> pretty t
+      <+> pretty @Text "else"
+      <+> pretty f
+  pretty (PhLet binds e) =
+    pretty @Text "let"
+      <+> align (pretty binds)
+      <+> pretty @Text "in"
+      <+> pretty e
+  pretty (PhDo stmts) = pretty @Text "do" <+> align (vcat $ map pretty stmts)
+  pretty (ExplicitTuple tupArgs) = parens $ hcat $ punctuate comma $ map pretty tupArgs
+  pretty (ExplicitList elems) = brackets $ hsep $ punctuate comma $ map pretty elems
+  pretty (ArithSeq info) = brackets $ pretty info
+  pretty (Typed t e) = pretty e <+> dcolon <+> pretty t
 
-instance Outputable PhLit where
-  ppr (LitInt i) = integer i
-  ppr (LitFloat d) = double d
-  ppr (LitChar c) = char '\'' <> char c <> char '\''
-  ppr (LitString s) = string $ show s -- need show to do escaping
+instance Pretty PhLit where
+  pretty (LitInt i) = pretty i
+  pretty (LitFloat d) = pretty d
+  pretty (LitChar c) = pretty '\'' <> pretty c <> pretty '\''
+  pretty (LitString s) = pretty $ show s -- need show to do escaping
 
-instance Outputable id => Outputable (MatchGroup id) where
-  ppr (MG (map unLoc -> alts) ctxt) = vcat $ map (pprMatch ctxt) alts
+instance (Pretty id) => Pretty (MatchGroup id) where
+  pretty (MG (map unLoc -> alts) ctxt) = vcat $ map (prettyMatch ctxt) alts
 
-pprMatch :: Outputable id => MatchContext -> Match id -> CDoc
-pprMatch ctxt (Match pats rhs) =
-  pprWhen (ctxt == LamCtxt) backslash
-    <> hsep (map ppr pats)
-    <+> pprRhs (if isCaseOrLamCtxt ctxt then arrow else equals) rhs
+prettyMatch :: (Pretty id) => MatchContext -> Match id -> Doc ann
+prettyMatch ctxt (Match pats rhs) =
+  prettyWhen (ctxt == LamCtxt) backslash
+    <> hsep (map pretty pats)
+    <+> prettyRhs (if isCaseOrLamCtxt ctxt then arrow else equals) rhs
 
-pprLocals :: Outputable id => LPhLocalBinds id -> CDoc
-pprLocals (unLoc -> LocalBinds [] []) = mempty
-pprLocals (unLoc -> ls) = text "where" $$ indent 2 (ppr ls)
+prettyLocals :: (Pretty id) => LPhLocalBinds id -> Doc ann
+prettyLocals (unLoc -> LocalBinds [] []) = mempty
+prettyLocals (unLoc -> ls) = pretty @Text "where" <+> indent 2 (pretty ls)
 
-pprRhs :: Outputable id => CDoc -> LRHS id -> CDoc
-pprRhs ctxt (unLoc -> RHS grhs locals) = attachLocals $ pprGrhs ctxt grhs
+prettyRhs :: (Pretty id) => Doc ann -> LRHS id -> Doc ann
+prettyRhs ctxt (unLoc -> RHS grhs locals) = attachLocals $ prettyGrhs ctxt grhs
   where
     attachLocals
       | (unLoc -> LocalBinds [] []) <- locals = id
-      | otherwise = ($$ pprLocals locals)
+      | otherwise = (<+> prettyLocals locals)
 
-pprGrhs :: Outputable id => CDoc -> LGRHS id -> CDoc
-pprGrhs ctxt (unLoc -> Unguarded body) = ctxt <+> ppr body
-pprGrhs ctxt (unLoc -> Guarded guards) = vcat $ map (pprGuard ctxt) guards
+prettyGrhs :: (Pretty id) => Doc ann -> LPhExpr id -> Doc ann
+prettyGrhs ctxt (unLoc -> body) = ctxt <+> pretty body
 
-pprGuard :: Outputable id => CDoc -> LGuard id -> CDoc
-pprGuard ctxt (unLoc -> Guard guard body) = vbar <+> ppr guard <+> ctxt <+> ppr body
+-- prettyGrhs ctxt (unLoc -> Guarded guards) = vcat $ map (prettyGuard ctxt) guards
 
-instance Outputable id => Outputable (Pat id) where
-  ppr (PVar id) = asPrefixVar (ppr id)
-  ppr (PCon id args) = asPrefixVar (ppr id) <+> hsep (map ppr args)
-  ppr (PAs id pat) = asPrefixVar (ppr id) <> char '@' <> ppr pat
-  ppr (PLit lit) = ppr lit
-  ppr PWild = char '_'
-  ppr (PTuple ps) = parens $ fsep $ punctuate comma $ map ppr ps
-  ppr (PList ps) = brackets . fsep . punctuate comma $ map ppr ps
-  ppr (ParPat pat) = parens $ ppr pat
+prettyGuard :: (Pretty id) => Doc ann -> LGuard id -> Doc ann
+prettyGuard ctxt (unLoc -> Guard guard body) = pipe <+> pretty guard <+> ctxt <+> pretty body
 
-instance Outputable id => Outputable (PhLocalBinds id) where
-  ppr (LocalBinds binds sigs) = vcat (map ppr binds ++ map ppr sigs)
+-- instance (Pretty id) => Pretty (Pat id) where
+--   pretty (PVar id) = asPrefixVar (pretty id)
+--   pretty (PCon id args) = asPrefixVar (pretty id) <+> hsep (map pretty args)
+--   pretty (PAs id pat) = asPrefixVar (pretty id) <> pretty '@' <> pretty pat
+--   pretty (PLit lit) = pretty lit
+--   pretty PWild = pretty '_'
+--   pretty (PTuple ps) = parens $ fsep $ punctuate comma $ map pretty ps
+--   pretty (PList ps) = brackets . fsep . punctuate comma $ map pretty ps
+--   pretty (ParPat pat) = parens $ pretty pat
 
-instance Outputable id => Outputable (PhBind id) where
-  ppr (FunBind id mg) = ppr id <+> ppr mg
-  ppr (PatBind pat body) = ppr pat <+> pprRhs (text "=") body
+instance (Pretty id) => Pretty (PhLocalBinds id) where
+  pretty (LocalBinds binds sigs) = vcat (map pretty binds ++ map pretty sigs)
 
-instance Outputable id => Outputable (Stmt id) where
-  ppr (SExpr e) = ppr e
-  ppr (SGenerator pat e) = ppr pat <+> larrow <+> ppr e
-  ppr (SLet binds) = text "let" <+> align (ppr binds)
+instance (Pretty id) => Pretty (PhBind id) where
+  pretty (FunBind id mg) = pretty id <+> pretty mg
 
-instance Outputable id => Outputable (ArithSeqInfo id) where
-  ppr (From e) = ppr e <+> text ".."
-  ppr (FromThen e1 e2) = (ppr e1 <> comma) <+> ppr e2 <+> text ".."
-  ppr (FromTo e1 e2) = ppr e1 <+> text ".." <+> ppr e2
-  ppr (FromThenTo e1 e2 e3) =
-    (ppr e1 <> comma) <+> ppr e2 <+> text ".." <+> ppr e3
+-- pretty (PatBind pat body) = pretty pat <+> prettyRhs (text "=") body
 
-instance Outputable id => Outputable (Sig id) where
-  ppr (TypeSig ids t) = hsep (punctuate comma $ map ppr ids) <+> text "::" <+> ppr t
+instance (Pretty id) => Pretty (Stmt id) where
+  pretty (SExpr e) = pretty e
+  -- pretty (SGenerator pat e) = pretty pat <+> larrow <+> pretty e
+  pretty (SLet binds) = pretty @Text "let" <+> align (pretty binds)
 
--- ppr (FixitySig assoc prec ids) =
---   ppr assoc
+instance (Pretty id) => Pretty (ArithSeqInfo id) where
+  pretty (From e) = pretty e <+> pretty @Text ".."
+  pretty (FromThen e1 e2) = (pretty e1 <> comma) <+> pretty e2 <+> pretty @Text ".."
+  pretty (FromTo e1 e2) = pretty e1 <+> pretty @Text ".." <+> pretty e2
+  pretty (FromThenTo e1 e2 e3) =
+    (pretty e1 <> comma) <+> pretty e2 <+> pretty @Text ".." <+> pretty e3
+
+instance (Pretty id) => Pretty (Sig id) where
+  pretty (TypeSig name t) = pretty name <+> pretty @Text "::" <+> pretty t
+
+-- pretty (FixitySig assoc prec ids) =
+--   pretty assoc
 --     <+> int prec
---     <+> hsep (punctuate comma $ map ppr ids)
+--     <+> hsep (punctuate comma $ map pretty ids)
 
-instance Outputable Assoc where
-  ppr Infix = text "infix"
-  ppr InfixL = text "infixl"
-  ppr InfixR = text "infixr"
+instance Pretty Assoc where
+  pretty Infix = pretty @Text "infix"
+  pretty InfixL = pretty @Text "infixl"
+  pretty InfixR = pretty @Text "infixr"

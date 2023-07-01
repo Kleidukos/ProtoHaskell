@@ -51,7 +51,7 @@ import Data.Text (Text)
 import Compiler.BasicTypes.FastString
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
-import Utils.Outputable
+import Prettyprinter
 
 {- NOTE: [Names in PHC]
 
@@ -70,7 +70,16 @@ data OccName = OccName
   , occNameSrcSpan :: !SrcSpan
   , nameFS :: !FastString
   }
-  deriving (Eq, Ord, Show)
+  deriving (Show)
+
+instance Eq OccName where
+  o1 == o2 = (o1.nameSpace == o2.nameSpace) || (o1.nameFS == o2.nameFS)
+
+instance Ord OccName where
+  compare o1 o2 =
+    case compare o1.nameSpace o2.nameSpace of
+      EQ -> compare o1.nameFS o2.nameFS
+      comp -> comp
 
 nameText :: OccName -> Text
 nameText occ = occ.nameFS.fs_text
@@ -89,8 +98,8 @@ instance HasUnique OccName where
 -- entity might /contain/ the OccName. Entities with OccNames typically have a Name, and the
 -- unique of the Name typically uniquely identifies the entity as well.
 
-instance Outputable OccName where
-  ppr (OccName _ _ fs) = ftext fs
+instance Pretty OccName where
+  pretty (OccName _ _ fs) = pretty fs
 
 mkOccName :: NameSpace -> SrcSpan -> Text -> OccName
 mkOccName ns span txt = OccName ns span (mkFastStringText txt)
@@ -145,11 +154,11 @@ isValNameSpace ns = ns `elem` [VarName, DataName]
 isTcClsNameSpace :: NameSpace -> Bool
 isTcClsNameSpace = (== TcClsName)
 
-pprNameSpace :: NameSpace -> CDoc
-pprNameSpace VarName = text "variable"
-pprNameSpace DataName = text "data constructor"
-pprNameSpace TvName = text "type variable"
-pprNameSpace TcClsName = text "type constructor or class"
+prettyNameSpace :: NameSpace -> Doc ann
+prettyNameSpace VarName =  "variable"
+prettyNameSpace DataName =  "data constructor"
+prettyNameSpace TvName =  "type variable"
+prettyNameSpace TcClsName =  "type constructor or class"
 
 -- | Namespaces are related if they can occur in the same contexts
 --   This will be useful later for guessing what a user meant
@@ -163,8 +172,8 @@ otherNameSpace DataName = VarName
 otherNameSpace TvName = TcClsName
 otherNameSpace TcClsName = TvName
 
-instance Outputable NameSpace where
-  ppr = pprNameSpace
+instance Pretty NameSpace where
+  pretty = prettyNameSpace
 
 -------------------------------------------------------------------------------------
 -- OccName predicates

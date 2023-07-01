@@ -16,8 +16,8 @@ module Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
+import Prettyprinter
 
-import Utils.Outputable
 
 -- | A 'Name' identifies an entity.
 -- It appears in the AST after the Renamer has turned all 'ParsedName's
@@ -43,10 +43,10 @@ data NameSort
     System
   deriving (Eq, Ord, Show, Enum, Bounded)
 
-instance Outputable NameSort where
-  ppr Internal = text "internal"
-  -- ppr External (Module _pkg name) = text "external" <+> parens (text name)
-  ppr System = text "system"
+instance Pretty NameSort where
+  pretty Internal =  "internal"
+  -- pretty External (Module _pkg name) =  "external" <+> parens (text name)
+  pretty System =  "system"
 
 instance HasSrcSpan Name where
   srcSpanOf name = srcSpanOf $ name.occ
@@ -82,5 +82,5 @@ isSystemName :: Name -> Bool
 isSystemName Name{sort = System} = True
 isSystemName _ = False
 
-instance Outputable Name where
-  ppr Name{occ = name} = ppr name
+instance Pretty Name where
+  pretty Name{occ = name} = pretty name

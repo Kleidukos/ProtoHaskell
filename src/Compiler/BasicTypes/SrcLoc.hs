@@ -1,6 +1,3 @@
--- Lots of ideas directly from ghc/comopiler/basicTypes/SrcLoc.hs
--- Lots of ideas directly from ghc/comopiler/basicTypes/SrcLoc.hs
--- Lots of ideas directly from ghc/comopiler/basicTypes/SrcLoc.hs
 {-# LANGUAGE DeriveTraversable #-}
 
 module Compiler.BasicTypes.SrcLoc
@@ -91,11 +88,11 @@ module Compiler.BasicTypes.SrcLoc
   , HasSrcSpan (..)
   ) where
 
-import Compiler.BasicTypes.FastString
-import Utils.Outputable
-
 import Data.Bits
-import Data.List (intercalate)
+import Prettyprinter (Pretty(..), Doc(), colon, hcat, comma, parens, braces)
+
+import Compiler.BasicTypes.FastString
+import Utils.Output
 
 ---------------------------------------------------------------------
 -- Source location information
@@ -350,47 +347,47 @@ instance Show RealSrcSpan where
           ["SrcSpanMultiLine", show file]
             ++ map show [sl, sc, el, ec]
 
-instance Outputable RealSrcSpan where
-  ppr = pprUserRealSpan True
+instance Pretty RealSrcSpan where
+  pretty = prettyUserRealSpan True
 
-instance Outputable SrcSpan where
-  ppr = pprUserSpan True
+instance Pretty SrcSpan where
+  pretty = prettyUserSpan True
 
-instance Outputable RealSrcLoc where
-  ppr = pprUserRealLoc True
+instance Pretty RealSrcLoc where
+  pretty = prettyUserRealLoc True
 
-instance Outputable SrcLoc where
-  ppr = pprUserLoc True
+instance Pretty SrcLoc where
+  pretty = prettyUserLoc True
 
-pprUserLoc :: Bool -> SrcLoc -> CDoc
-pprUserLoc _ (UnhelpfulLoc l) = ppr l
-pprUserLoc showPath (RealSrcLoc l) = pprUserRealLoc showPath l
+prettyUserLoc :: Bool -> SrcLoc -> Doc ann
+prettyUserLoc _ (UnhelpfulLoc l) = pretty l
+prettyUserLoc showPath (RealSrcLoc l) = prettyUserRealLoc showPath l
 
-pprUserRealLoc :: Bool -> RealSrcLoc -> CDoc
-pprUserRealLoc showPath loc@(SrcLoc file line col) =
-  pprWhen showPath (ppr file <> colon) <> ppr line <> colon <> ppr col
+prettyUserRealLoc :: Bool -> RealSrcLoc -> Doc ann
+prettyUserRealLoc showPath loc@(SrcLoc file line col) =
+  prettyWhen showPath (pretty file <> colon) <> pretty line <> colon <> pretty col
 
-pprUserSpan :: Bool -> SrcSpan -> CDoc
-pprUserSpan _ (UnhelpfulSpan s) = ppr s
-pprUserSpan showPath (RealSrcSpan s) = pprUserRealSpan showPath s
+prettyUserSpan :: Bool -> SrcSpan -> Doc ann
+prettyUserSpan _ (UnhelpfulSpan s) = pretty s
+prettyUserSpan showPath (RealSrcSpan s) = prettyUserRealSpan showPath s
 
-pprUserRealSpan :: Bool -> RealSrcSpan -> CDoc
-pprUserRealSpan showPath span@(SrcSpan file sline scol eline ecol)
+prettyUserRealSpan :: Bool -> RealSrcSpan -> Doc ann
+prettyUserRealSpan showPath span@(SrcSpan file sline scol eline ecol)
   | isPointRealSpan span =
-      pprUserRealLoc showPath $ realSrcSpanStart span
+      prettyUserRealLoc showPath $ realSrcSpanStart span
   | isOneLineRealSpan span =
       hcat
-        [ pprWhen showPath (ppr file <> colon)
-        , int sline <> colon
-        , int scol
-        , pprUnless (ecol - scol <= 1) (char '-' <> int (ecol - 1))
+        [ prettyWhen showPath (pretty file <> colon)
+        , pretty sline <> colon
+        , pretty scol
+        , prettyUnless (ecol - scol <= 1) (pretty '-' <> pretty (ecol - 1))
         ]
   | otherwise =
       hcat
-        [ pprWhen showPath (ppr file <> colon)
-        , parens (int sline <> comma <> int scol)
-        , char '-'
-        , parens (int eline <> comma <> int ecol')
+        [ prettyWhen showPath (pretty file <> colon)
+        , parens (pretty sline <> comma <> pretty scol)
+        , pretty '-'
+        , parens (pretty eline <> comma <> pretty ecol')
         ]
   where
     ecol' = if ecol == 0 then ecol else ecol - 1
@@ -422,7 +419,7 @@ type RealLocated = GenLocated RealSrcSpan
 mapLoc :: (a -> b) -> GenLocated l a -> GenLocated l b
 mapLoc = fmap
 
-mapLocM :: Monad m => (a -> m b) -> GenLocated l a -> m (GenLocated l b)
+mapLocM :: (Monad m) => (a -> m b) -> GenLocated l a -> m (GenLocated l b)
 mapLocM = mapM
 
 unLoc :: GenLocated l a -> a
@@ -448,14 +445,14 @@ addCombinedLoc a b = Located (combineLocs a b)
 
 -- Not a satisfactory general Eq instance
 -- ingores the location and compares the located things.
-eqLocated :: Eq a => Located a -> Located a -> Bool
+eqLocated :: (Eq a) => Located a -> Located a -> Bool
 eqLocated a b = unLoc a == unLoc b
 
 -- Not a satisfactory general Ord instance
 -- ignores the location and compares the located things.
-cmpLocated :: Ord a => Located a -> Located a -> Ordering
+cmpLocated :: (Ord a) => Located a -> Located a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
-instance (Outputable l, Outputable a) => Outputable (GenLocated l a) where
-  pprPrec p (Located l a) =
-    whenDebugStyle (braces (pprPrec p l)) <> pprPrec p a
+instance (Pretty l, Pretty a) => Pretty (GenLocated l a) where
+  pretty (Located l a) =
+    braces (pretty l) <> pretty a

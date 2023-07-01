@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+
 module Compiler.BasicTypes.ParsedName
   ( ParsedName
   , mkUnQual
@@ -16,7 +18,8 @@ import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 
-import Utils.Outputable
+import GHC.Records
+import Prettyprinter
 
 -- | A 'ParsedName' is an identifier produced by the Parser.
 data ParsedName
@@ -33,7 +36,14 @@ data ParsedName
   | -- | An exact 'Name'. Used when parsing syntax like '[]'.
     -- Can only be created by 'getParsedName'.
     Exact Name
-  deriving (Show)
+  deriving (Eq, Ord, Show)
+
+instance HasField "occ" ParsedName OccName where
+  getField = \case
+    (UnQual n) -> n
+    (Qual _ n) -> n
+    (Orig _ n) -> n
+    (Exact n) -> n.occ
 
 mkUnQual :: NameSpace -> SrcSpan -> Text -> ParsedName
 mkUnQual ns ss t = UnQual (mkOccName ns ss t)
@@ -60,7 +70,7 @@ parsedNameOcc (Orig _ n) = n
 parsedNameOcc (Exact n) = n.occ
 
 parsedNameSpace :: ParsedName -> NameSpace
-parsedNameSpace pn = (parsedNameOcc pn).nameSpace
+parsedNameSpace pn = pn.occ.nameSpace
 
 getParsedName :: Name -> ParsedName
 getParsedName = Exact
@@ -70,8 +80,8 @@ isSrcParsedName (UnQual _) = True
 isSrcParsedName (Qual _ _) = True
 isSrcParsedName _ = False
 
-instance Outputable ParsedName where
-  ppr (UnQual n) = ppr n
-  ppr (Qual qual n) = ppr qual <> dot <> ppr n
-  ppr (Orig qual n) = ppr qual <> dot <> ppr n
-  ppr (Exact name) = ppr name
+instance Pretty ParsedName where
+  pretty (UnQual n) = pretty n
+  pretty (Qual qual n) = pretty qual <> dot <> pretty n
+  pretty (Orig qual n) = pretty qual <> dot <> pretty n
+  pretty (Exact name) = pretty name

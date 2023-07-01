@@ -63,20 +63,20 @@ arguments, the `INLINE` pragma should be replicated in the @zipWithNM@
 functions below as well.
 -}
 
-zipWith3M :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+zipWith3M :: (Monad m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
 {-# INLINE zipWith3M #-}
 -- Inline so that fusion with 'zipWith3' and 'sequenceA' has a chance to fire.
 -- See Note [Inline @zipWithNM@ functions] above.
 zipWith3M f xs ys zs = sequenceA (zipWith3 f xs ys zs)
 
-zipWith3M_ :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
+zipWith3M_ :: (Monad m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
 {-# INLINE zipWith3M_ #-}
 -- Inline so that fusion with 'zipWith4' and 'sequenceA' has a chance to fire.
 -- See  Note [Inline @zipWithNM@ functions] above.
 zipWith3M_ f xs ys zs = sequenceA_ (zipWith3 f xs ys zs)
 
 zipWith4M
-  :: Monad m
+  :: (Monad m)
   => (a -> b -> c -> d -> m e)
   -> [a]
   -> [b]
@@ -89,7 +89,7 @@ zipWith4M
 zipWith4M f xs ys ws zs = sequenceA (zipWith4 f xs ys ws zs)
 
 zipWithAndUnzipM
-  :: Monad m
+  :: (Monad m)
   => (a -> b -> m (c, d))
   -> [a]
   -> [b]
@@ -123,19 +123,19 @@ pragma should be replicated in the @mapAndUnzipNM@ functions below as well.
 -}
 
 -- | mapAndUnzipM for triples
-mapAndUnzip3M :: Monad m => (a -> m (b, c, d)) -> [a] -> m ([b], [c], [d])
+mapAndUnzip3M :: (Monad m) => (a -> m (b, c, d)) -> [a] -> m ([b], [c], [d])
 {-# INLINE mapAndUnzip3M #-}
 -- Inline so that fusion with 'unzip3' and 'traverse' has a chance to fire.
 -- See Note [Inline @mapAndUnzipNM@ functions] above.
 mapAndUnzip3M f xs = unzip3 <$> traverse f xs
 
-mapAndUnzip4M :: Monad m => (a -> m (b, c, d, e)) -> [a] -> m ([b], [c], [d], [e])
+mapAndUnzip4M :: (Monad m) => (a -> m (b, c, d, e)) -> [a] -> m ([b], [c], [d], [e])
 {-# INLINE mapAndUnzip4M #-}
 -- Inline so that fusion with 'unzip4' and 'traverse' has a chance to fire.
 -- See Note [Inline @mapAndUnzipNM@ functions] above.
 mapAndUnzip4M f xs = unzip4 <$> traverse f xs
 
-mapAndUnzip5M :: Monad m => (a -> m (b, c, d, e, f)) -> [a] -> m ([b], [c], [d], [e], [f])
+mapAndUnzip5M :: (Monad m) => (a -> m (b, c, d, e, f)) -> [a] -> m ([b], [c], [d], [e], [f])
 {-# INLINE mapAndUnzip5M #-}
 -- Inline so that fusion with 'unzip5' and 'traverse' has a chance to fire.
 -- See Note [Inline @mapAndUnzipNM@ functions] above.
@@ -143,7 +143,7 @@ mapAndUnzip5M f xs = unzip5 <$> traverse f xs
 
 -- | Monadic version of mapAccumL
 mapAccumLM
-  :: Monad m
+  :: (Monad m)
   => (acc -> x -> m (acc, y))
   -- ^ combining function
   -> acc
@@ -159,16 +159,16 @@ mapAccumLM f s (x : xs) = do
   return (s2, x' : xs')
 
 -- | Monadic version of mapSnd
-mapSndM :: Monad m => (b -> m c) -> [(a, b)] -> m [(a, c)]
+mapSndM :: (Monad m) => (b -> m c) -> [(a, b)] -> m [(a, c)]
 mapSndM _ [] = return []
 mapSndM f ((a, b) : xs) = do c <- f b; rs <- mapSndM f xs; return ((a, c) : rs)
 
 -- | Monadic version of concatMap
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f xs = fmap concat (mapM f xs)
 
 -- | Applicative version of mapMaybe
-mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]
+mapMaybeM :: (Applicative m) => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f = foldr g (pure [])
   where
     g a = liftA2 (maybe id (:)) (f a)
@@ -179,12 +179,12 @@ fmapMaybeM _ Nothing = return Nothing
 fmapMaybeM f (Just x) = f x <&> Just
 
 -- | Monadic version of fmap
-fmapEitherM :: Monad m => (a -> m b) -> (c -> m d) -> Either a c -> m (Either b d)
+fmapEitherM :: (Monad m) => (a -> m b) -> (c -> m d) -> Either a c -> m (Either b d)
 fmapEitherM fl _ (Left a) = fl a <&> Left
 fmapEitherM _ fr (Right b) = fr b <&> Right
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
-anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
 anyM _ [] = return False
 anyM f (x : xs) = do
   b <- f x
@@ -193,12 +193,12 @@ anyM f (x : xs) = do
     else anyM f xs
 
 -- | Monad version of 'all', aborts the computation at the first @False@ value
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
 allM _ [] = return True
 allM f (b : bs) = f b >>= (\bv -> if bv then allM f bs else return False)
 
 -- | Monadic version of or
-orM :: Monad m => m Bool -> m Bool -> m Bool
+orM :: (Monad m) => m Bool -> m Bool -> m Bool
 orM m1 m2 = m1 >>= \x -> if x then return True else m2
 
 -- | Monadic version of foldl that discards its result
@@ -206,18 +206,18 @@ foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
 foldlM_ = foldM_
 
 -- | Monadic version of fmap specialised for Maybe
-maybeMapM :: Monad m => (a -> m b) -> (Maybe a -> m (Maybe b))
+maybeMapM :: (Monad m) => (a -> m b) -> (Maybe a -> m (Maybe b))
 maybeMapM _ Nothing = return Nothing
 maybeMapM m (Just x) = fmap Just $ m x
 
 -- | Monadic version of @when@, taking the condition in the monad
-whenM :: Monad m => m Bool -> m () -> m ()
+whenM :: (Monad m) => m Bool -> m () -> m ()
 whenM mb thing = do
   b <- mb
   when b thing
 
 -- | Monadic version of @unless@, taking the condition in the monad
-unlessM :: Monad m => m Bool -> m () -> m ()
+unlessM :: (Monad m) => m Bool -> m () -> m ()
 unlessM condM acc = do
   cond <- condM
   unless cond acc

@@ -1,20 +1,19 @@
-module Compiler.Parser.Errors (pprParseError) where
+module Compiler.Parser.Errors (prettyParseError) where
 
 import Text.Parsec.Error
 import Text.Parsec.Pos
+import Data.Char
+import Prettyprinter
 
 import Compiler.BasicTypes.SrcLoc
 import Compiler.Parser.Lexer
-import Utils.Outputable
 
-import Data.Char
-
-pprParseError :: ParseError -> String -> [Lexeme] -> CDoc
-pprParseError pe "" [] = string $ show pe -- Use string . show instead of ppr in case
--- definition of ppr changes to use this function
-pprParseError pe "" _ = string $ show pe
-pprParseError pe _ [] = string $ show pe
-pprParseError pe src lexemes =
+prettyParseError :: ParseError -> String -> [Lexeme] -> Doc ann
+prettyParseError pe "" [] = pretty $ show pe -- Use pretty . show instead of pretty in case
+-- definition of pretty changes to use this function
+prettyParseError pe "" _ = pretty $ show pe
+prettyParseError pe _ [] = pretty $ show pe
+prettyParseError pe src lexemes =
   let pos = errorPos pe
       msgs = errorMessages pe
       line = sourceLine pos
@@ -27,9 +26,9 @@ pprParseError pe src lexemes =
         (Nothing, Just _) -> Lexeme
       spaces = hcat $ replicate (length (show line) + 1) space
       template src arrows =
-        (spaces <> vbar)
-          $$ (string (show line) <+> vbar <+> src)
-          $$ (spaces <> vbar <+> arrows)
+        (spaces <> pipe)
+          <+> (pretty (show line) <+> pipe <+> src)
+          <+> (spaces <> pipe <+> arrows)
    in mkErrorMessage infoAmount info pos msgs template
 
 data InfoAmount = NoInfo | Source | SourceAndLexeme | Lexeme
@@ -65,16 +64,16 @@ mkErrorMessage
   -> (Maybe String, Maybe Lexeme) -- Components for source/arrows
   -> SourcePos -- Position of error
   -> [Message] -- Parsec error messages
-  -> (CDoc -> CDoc -> CDoc) -- Callback to template
+  -> (Doc ann -> Doc ann -> Doc ann) -- Callback to template
   -- source/arrows into msg
-  -> CDoc
+  -> Doc ann
 mkErrorMessage infoAmt info pos msgs template =
   let prettySource = case infoAmt of
         NoInfo -> mempty
         Source -> templateSource
         SourceAndLexeme -> templateSourceAndLexeme
         Lexeme -> templateLexeme
-   in header pos $$ prettySource $$ errMsgBody msgs
+   in header pos <+> prettySource <+> errMsgBody msgs
   where
     getBodyAndArrowWs src =
       let col = sourceColumn pos
@@ -82,12 +81,12 @@ mkErrorMessage infoAmt info pos msgs template =
           initSrcLoc = mkRealSrcLoc "" (sourceLine pos) 1
           bodyStartLoc = foldl advanceSrcLoc initSrcLoc leadingWS
           arrowWs = replicate (col - realSrcLocCol bodyStartLoc) space
-       in (string body, hcat arrowWs)
+       in (pretty body, hcat arrowWs)
 
     templateSource =
       let (Just src, _) = info
           (body, arrowWs) = getBodyAndArrowWs src
-          arrows = char '^'
+          arrows = pretty '^'
        in template body (arrowWs <> arrows)
 
     templateSourceAndLexeme =
@@ -95,23 +94,23 @@ mkErrorMessage infoAmt info pos msgs template =
           (body, arrowWs) = getBodyAndArrowWs src
           mNumArrows = realSrcSpanLength span
        in case mNumArrows of
-            Nothing -> text "<Can't display source>"
-            Just num -> template body (arrowWs <> hcat (replicate num $ char '^'))
+            Nothing -> "<Can't display source>"
+            Just num -> template body (arrowWs <> hcat (replicate num $ pretty '^'))
 
     templateLexeme =
       let (_, Just (Located _ token)) = info
-          body = ppr token
-          arrows = hcat $ replicate (length (show token)) $ char '^'
+          body = pretty token
+          arrows = hcat $ replicate (length (show token)) $ pretty '^'
        in case length (lines (show token)) of
             1 -> template body arrows
-            _ -> text "<Can't display source>"
+            _ -> "<Can't display source>"
 
-header :: SourcePos -> CDoc
-header pos = text "Parse error at" <+> string (showPos pos) <> ":"
+header :: SourcePos -> Doc ann
+header pos = "Parse error at" <+> pretty (showPos pos) <> ":"
 
-errMsgBody :: [Message] -> CDoc
+errMsgBody :: [Message] -> Doc ann
 errMsgBody =
-  string
+  pretty
     . showErrorMessages
       "or"
       "unknown parse error"

@@ -2,18 +2,11 @@ module Compiler.TypeChecker where
 
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Text (Text)
 
-import Compiler.BasicTypes.OccName
-import Compiler.BasicTypes.ParsedName
-import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
-import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhType
 import Effectful
-import Effectful.Error.Static
 import Effectful.Reader.Static
-import Effectful.State.Static.Local (State)
 
 type Environment = Map Unique (LPhType Unique)
 

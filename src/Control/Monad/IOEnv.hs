@@ -79,7 +79,7 @@ data IOEnvFailure = IOEnvFailure
 instance Show IOEnvFailure where show _ = "IOEnv failure"
 instance Exception IOEnvFailure
 
-instance ContainsSettings env => HasSettings (IOEnv env) where
+instance (ContainsSettings env) => HasSettings (IOEnv env) where
   getSettings = do
     env <- getEnv
     -- flags won't change often (during compilation, only via options pragmas)

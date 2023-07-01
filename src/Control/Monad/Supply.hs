@@ -26,7 +26,7 @@ newtype SupplyT s m a = SupplyT (StateT [s] m a)
     , MonadFix
     )
 
-runSupplyT :: Monad m => SupplyT s m a -> [s] -> m a
+runSupplyT :: (Monad m) => SupplyT s m a -> [s] -> m a
 runSupplyT (SupplyT m) = evalStateT m
 
 type Supply s = SupplyT s Identity
@@ -34,23 +34,23 @@ type Supply s = SupplyT s Identity
 runSupply :: Supply s a -> [s] -> a
 runSupply s = runIdentity . runSupplyT s
 
-getSupply :: Monad m => SupplyT s m [s]
+getSupply :: (Monad m) => SupplyT s m [s]
 getSupply = SupplyT get
 
-withRemaining :: Monad m => SupplyT s m a -> SupplyT s m (a, [s])
+withRemaining :: (Monad m) => SupplyT s m a -> SupplyT s m (a, [s])
 withRemaining m = do
   a <- m
   s <- getSupply
   return (a, s)
 
-instance Monad m => MonadSupply s (SupplyT s m) where
+instance (Monad m) => MonadSupply s (SupplyT s m) where
   supply = supplyST
   isExhausted = isExhaustedST
 
-supplyST :: Monad m => SupplyT s m s
+supplyST :: (Monad m) => SupplyT s m s
 supplyST = SupplyT $ state $ \s -> (head s, tail s)
 
-isExhaustedST :: Monad m => SupplyT s m Bool
+isExhaustedST :: (Monad m) => SupplyT s m Bool
 isExhaustedST = SupplyT $ gets null
 
 defaultStringSupply :: [String]
@@ -61,10 +61,10 @@ defaultStringSupply =
 defaultNameSupply :: [String]
 defaultNameSupply = [1 ..] >>= flip replicateM ['a' .. 'z']
 
-defaultNumSupply :: Num a => [a]
+defaultNumSupply :: (Num a) => [a]
 defaultNumSupply = map fromIntegral [1 ..]
 
-instance MonadError e m => MonadError e (SupplyT s m) where
+instance (MonadError e m) => MonadError e (SupplyT s m) where
   throwError e = SupplyT $ StateT $ \s -> do
     a <- throwError e
     return (a, s)

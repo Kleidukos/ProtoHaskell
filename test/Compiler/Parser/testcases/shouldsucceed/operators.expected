@@ -88,26 +88,22 @@ Right
                     { matchPats =
                       [ Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 4 13 14 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 4 13 14
-                              , nameFS = x
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 4 13 14
+                            , nameFS = x
+                            }
                           )
                         )
                       , Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 4 15 16 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 4 15 16
-                              , nameFS = y
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 4 15 16
+                            , nameFS = y
+                            }
                           )
                         )
                       ]
@@ -257,26 +253,22 @@ Right
                     { matchPats =
                       [ Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 7 13 14 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 7 13 14
-                              , nameFS = x
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 7 13 14
+                            , nameFS = x
+                            }
                           )
                         )
                       , Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 7 15 16 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 7 15 16
-                              , nameFS = y
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 7 15 16
+                            , nameFS = y
+                            }
                           )
                         )
                       ]
@@ -414,44 +406,50 @@ Right
       , Located
         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 1 15 )
         ( Binding
-          ( PatBind
-            ( Located
-              ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 1 9 )
-              ( PVar
-                ( UnQual
-                  ( OccName
-                    { nameSpace = VarName
-                    , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 1 9
-                    , nameFS = etaOpApp
-                    }
-                  )
-                )
-              )
-            )
-            ( Located
-              ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 10 15 )
-              ( RHS
-                { grhs = Located
-                  ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 10 15 )
-                  ( Unguarded
-                    ( Located
-                      ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 12 15 )
-                      ( PhVar
-                        ( UnQual
-                          ( OccName
-                            { nameSpace = VarName
-                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 13 14
-                            , nameFS = +
-                            }
-                          )
-                        )
-                      )
-                    )
-                  )
-                , localBinds = Located ( UnhelpfulSpan <no location info> )
-                  ( LocalBinds [] [] )
+          ( FunBind
+            ( UnQual
+              ( OccName
+                { nameSpace = VarName
+                , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 1 9
+                , nameFS = etaOpApp
                 }
               )
+            )
+            ( MG
+              { alternatives =
+                [ Located
+                  ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 10 15 )
+                  ( Match
+                    { matchPats = []
+                    , rhs = Located
+                      ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 10 15 )
+                      ( RHS
+                        { grhs = Located
+                          ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 10 15 )
+                          ( Unguarded
+                            ( Located
+                              ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 12 15 )
+                              ( PhVar
+                                ( UnQual
+                                  ( OccName
+                                    { nameSpace = VarName
+                                    , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 10 13 14
+                                    , nameFS = +
+                                    }
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        , localBinds = Located ( UnhelpfulSpan <no location info> )
+                          ( LocalBinds [] [] )
+                        }
+                      )
+                    }
+                  )
+                ]
+              , context = FunCtxt
+              }
             )
           )
         )
@@ -538,26 +536,22 @@ Right
                     { matchPats =
                       [ Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 13 14 15 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 13 14 15
-                              , nameFS = x
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 13 14 15
+                            , nameFS = x
+                            }
                           )
                         )
                       , Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 13 16 17 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 13 16 17
-                              , nameFS = y
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 13 16 17
+                            , nameFS = y
+                            }
                           )
                         )
                       ]
@@ -707,26 +701,22 @@ Right
                     { matchPats =
                       [ Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 16 13 14 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 16 13 14
-                              , nameFS = x
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 16 13 14
+                            , nameFS = x
+                            }
                           )
                         )
                       , Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 16 15 16 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 16 15 16
-                              , nameFS = y
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 16 15 16
+                            , nameFS = y
+                            }
                           )
                         )
                       ]
@@ -881,26 +871,22 @@ Right
                     { matchPats =
                       [ Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 19 17 18 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 19 17 18
-                              , nameFS = x
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 19 17 18
+                            , nameFS = x
+                            }
                           )
                         )
                       , Located
                         ( RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 19 19 20 )
-                        ( PVar
-                          ( UnQual
-                            ( OccName
-                              { nameSpace = VarName
-                              , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 19 19 20
-                              , nameFS = y
-                              }
-                            )
+                        ( UnQual
+                          ( OccName
+                            { nameSpace = VarName
+                            , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/Compiler/Parser/testcases/shouldsucceed/operators.hs 19 19 20
+                            , nameFS = y
+                            }
                           )
                         )
                       ]

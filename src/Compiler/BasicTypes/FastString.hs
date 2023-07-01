@@ -16,7 +16,7 @@ Implementation ideas are partially taken from GHC, but mostly just the module AP
 module Compiler.BasicTypes.FastString where
 
 import Compiler.BasicTypes.Unique
-import Utils.Outputable (CDoc, Outputable (..), text)
+import Prettyprinter
 
 import Data.Functor (($>))
 
@@ -74,11 +74,8 @@ instance Show FastString where
 instance HasUnique FastString where
   getUnique = fs_uniq
 
-instance Outputable FastString where
-  ppr = ftext
-
-ftext :: FastString -> CDoc
-ftext = text . fs_text
+instance Pretty FastString where
+  pretty fs = pretty fs.fs_text
 
 --------------------------------------------------------------------------------------
 --

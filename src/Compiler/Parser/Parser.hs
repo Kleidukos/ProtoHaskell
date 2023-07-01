@@ -1,11 +1,11 @@
 module Compiler.Parser.Parser
-  ( parse
-  ) where
+where
 
 import Prelude hiding (lex)
 
 import Data.Bifunctor qualified as Bifunctor
 import Data.Text (Text)
+import Prettyprinter (Doc, pretty)
 
 import Compiler.Parser.Errors
 import Compiler.Parser.Helpers
@@ -13,7 +13,6 @@ import Compiler.Parser.Pattern qualified as Pattern
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhSyn
 import Compiler.PhSyn.PhType
-import Utils.Outputable as Out (CDoc, string)
 
 -----------------------------------------------------------------------------------------
 -- Main parse driver
@@ -22,13 +21,13 @@ import Utils.Outputable as Out (CDoc, string)
 -- | Takes a filename, compiler flags, and input source.
 -- Outputs either an error (already pretty printed) or a PhModule.
 
--- TODO: fail with ErrMsg instead of CDoc
-parse :: SourceName -> Settings -> String -> Either CDoc (PhModule ParsedName)
+-- TODO: fail with ErrMsg instead of 'Doc'
+parse :: SourceName -> Settings -> String -> Either (Doc ann) (PhModule ParsedName)
 parse srcname flags input = do
-  lexemes <- Bifunctor.first Out.string $ lex srcname input
+  lexemes <- Bifunctor.first pretty $ lex srcname input
   case runParser (modl <* eof) srcname flags lexemes of
     Right modl -> Right modl
-    Left parseErr -> Left $ pprParseError parseErr input lexemes
+    Left parseErr -> Left $ prettyParseError parseErr input lexemes
 
 -----------------------------------------------------------------------------------------
 -- Component Parsers
@@ -53,8 +52,8 @@ parseTopDecl =
   parseDataDecl
     <|> parseSignature
     <|> parseBinding
-    <|> parseClassDecl
-    <|> parseInstanceDecl
+    -- <|> parseClassDecl
+    -- <|> parseInstanceDecl
     <?> "top-level declaration"
 
 parseDataDecl :: Parser (LPhDecl ParsedName)
@@ -80,9 +79,9 @@ parseSignature =
 
 parseTypeSignature :: Parser (Sig ParsedName)
 parseTypeSignature = do
-  names <- commaSep1 (varid <|> parens varsym)
+  name <- varid
   reservedOp "::"
-  TypeSig names <$> parseContextType
+  TypeSig name <$> parseContextType
 
 -- parseFixitySignature :: Parser (Sig ParsedName)
 -- parseFixitySignature =
@@ -101,7 +100,7 @@ parseBinding :: Parser (LPhDecl ParsedName)
 parseBinding = locate . fmap Binding $ parseBind
 
 parseBind :: Parser (PhBind ParsedName)
-parseBind = try parseFunBinding <|> parsePatternBinding
+parseBind = parseFunBinding
 
 -- TODO: parse bindings for operators
 parseFunBinding :: Parser (PhBind ParsedName)
@@ -110,29 +109,29 @@ parseFunBinding = do
   match <- locate $ parseMatch FunCtxt
   return $ FunBind funName $ MG{alternatives = [match], context = FunCtxt}
 
-parsePatternBinding :: Parser (PhBind ParsedName)
-parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
+-- parsePatternBinding :: Parser (PhBind ParsedName)
+-- parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
 
-emptyLocalBinds :: PhLocalBinds ParsedName
-emptyLocalBinds = LocalBinds [] []
+-- emptyLocalBinds :: PhLocalBinds ParsedName
+-- emptyLocalBinds = LocalBinds [] []
 
-parseClassDecl :: Parser (LPhDecl ParsedName)
-parseClassDecl = locate $ do
-  reserved "class"
-  ctx <- try (parseSimpleContext <* reservedOp "=>") <|> return []
-  ClassDecl ctx
-    <$> tyclsid -- renamer has to check that this is unqualified
-    <*> tyvarid
-    <*> ((reserved "where" *> parseLocalBinds) <|> locate (return emptyLocalBinds))
+-- parseClassDecl :: Parser (LPhDecl ParsedName)
+-- parseClassDecl = locate $ do
+--   reserved "class"
+--   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> return []
+--   ClassDecl ctx
+--     <$> tyclsid -- renamer has to check that this is unqualified
+--     <*> tyvarid
+--     <*> ((reserved "where" *> parseLocalBinds) <|> locate (return emptyLocalBinds))
 
-parseInstanceDecl :: Parser (LPhDecl ParsedName)
-parseInstanceDecl = locate $ do
-  reserved "instance"
-  ctx <- try (parseSimpleContext <* reservedOp "=>") <|> return []
-  InstDecl ctx
-    <$> tyclsid
-    <*> parseType
-    <*> ((reserved "where" *> parseLocalBinds) <|> locate (return emptyLocalBinds))
+-- parseInstanceDecl :: Parser (LPhDecl ParsedName)
+-- parseInstanceDecl = locate $ do
+--   reserved "instance"
+--   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> return []
+--   InstDecl ctx
+--     <$> tyclsid
+--     <*> parseType
+--     <*> ((reserved "where" *> parseLocalBinds) <|> locate (return emptyLocalBinds))
 
 -- | Parses a single match which will eventually be part of a match group.
 --
@@ -143,7 +142,7 @@ parseInstanceDecl = locate $ do
 -- See also: 'parseRHS'
 parseMatch :: MatchContext -> Parser (Match ParsedName)
 parseMatch ctx = do
-  pats <- many1 Pattern.parseLocated
+  pats <- many Pattern.parseLocated
   rhs <- locate $ parseRHS ctx
   return Match{matchPats = pats, rhs}
 
@@ -152,12 +151,12 @@ parseMatch ctx = do
 -- hardly anyone ever uses that feature.
 parseRHS :: MatchContext -> Parser (RHS ParsedName)
 parseRHS ctx = do
-  grhs <- locate $ parseGRHS ctx
+  expr <- parseGRHS ctx
   mLocalBinds <-
     if ctx /= LamCtxt
       then optionMaybe (token TokWhere >> parseLocalBinds) <?> "where clause"
       else return Nothing
-  return RHS{grhs, localBinds = flatten mLocalBinds}
+  return RHS{expr, localBinds = flatten mLocalBinds}
   where
     flatten (Just binds) = binds
     flatten Nothing = Located noSrcSpan $ LocalBinds [] []
@@ -168,26 +167,13 @@ parseRHS ctx = do
 -- but by '=' in Fun and Let contexts
 --
 -- Lam contexts are not allowed to contain guards.
-parseGRHS :: MatchContext -> Parser (GuardedRHS ParsedName)
+parseGRHS :: MatchContext -> Parser (LPhExpr ParsedName)
 parseGRHS LamCtxt = do
   matchCtx2Parser LamCtxt
-  Unguarded <$> parseLocExpr
-parseGRHS ctxt = parseGuarded <|> parseUnguarded
+  parseLocExpr
+parseGRHS ctxt = parseUnguarded
   where
-    parseBinder :: Parser ()
-    parseBinder = matchCtx2Parser ctxt
-
-    parseGuarded :: Parser (GuardedRHS ParsedName)
-    parseGuarded = reservedOp "|" >> Guarded <$> parseGuard `sepBy1` reservedOp "|"
-
-    parseGuard :: Parser (LGuard ParsedName)
-    parseGuard = locate $ do
-      guard <- parseLocExpr
-      parseBinder
-      rhs <- parseLocExpr
-      return $ Guard guard rhs
-
-    parseUnguarded = parseBinder >> Unguarded <$> parseLocExpr
+    parseUnguarded = matchCtx2Parser ctxt >> parseLocExpr
 
 type LocalDecls = ([LPhBind ParsedName], [LSig ParsedName])
 parseLocalBinds :: Parser (LPhLocalBinds ParsedName)
@@ -255,8 +241,8 @@ parseInfixExp :: Parser (PhExpr ParsedName)
 parseInfixExp =
   parseSyntacticNegation
     <|> unLoc
-    <$> locate parseBExp
-    `chainl1` parseQopFunc
+      <$> locate parseBExp
+        `chainl1` parseQopFunc
   where
     parseQopFunc = mkOpApp <$> parseQop
     mkOpApp op x@(Located left _) y@(Located right _) =
@@ -390,14 +376,14 @@ parseDoStmts = block1 parseDoStmt
 parseDoStmt :: Parser (LStmt ParsedName)
 parseDoStmt =
   locate
-    ( try
-        ( do
-            pat <- Pattern.parseLocated
-            reservedOp "<-"
-            e <- parseLocExpr
-            return $ SGenerator pat e
-        )
-        <|> try (reserved "let" *> (SLet <$> parseLocalBinds))
+    ( -- ( try
+      --     ( do
+      --         pat <- Pattern.parseLocated
+      --         reservedOp "<-"
+      --         e <- parseLocExpr
+      --         return $ SGenerator pat e
+      --     )
+      try (reserved "let" *> (SLet <$> parseLocalBinds))
         <|> SExpr <$> parseLocExpr
         <?> "statement of a do block"
     )

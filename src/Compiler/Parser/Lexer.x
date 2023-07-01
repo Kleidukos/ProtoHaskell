@@ -20,9 +20,10 @@ import Prelude hiding (lex)
 import Data.Char (isAlphaNum, chr)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Prettyprinter
 
 import Compiler.BasicTypes.SrcLoc
-import Utils.Outputable
+import Utils.Output
 }
 
 %wrapper "monadUserState"
@@ -346,7 +347,12 @@ alexGetFilename = Alex $ \s -> Right (s, alex_ust s)
 alexGetPos :: Alex AlexPosn
 alexGetPos = Alex $ \s -> Right (s, alex_pos s)
 
-lex :: String -> String -> Either String [Lexeme]
+lex 
+  :: String
+    -- ^ Input name
+  -> String
+    -- ^ Input
+  -> Either String [Lexeme]
 lex fname input = do
     lexemes <- runAlex input $ alexInitFilename fname >> init <$> alexLex
     return $ insertIndentationToks lexemes
@@ -374,8 +380,8 @@ insertIndentationToks (l@(Located srcSpan _) : ls) =
 
 showPosn (AlexPn _ line col) = show line <> ":" <> show col
 
-instance Outputable Token where
-    ppr tok = text $ case tok of
+instance Pretty Token where
+    pretty tok = case tok of
         TokLParen -> "("
         TokRParen -> ")"
         TokComma  -> ","
@@ -386,10 +392,10 @@ instance Outputable Token where
         TokRBrace    -> "}"
         TokBackquote -> "`"
         TokUnderscore -> "_"
-        TokLitInteger i -> i
-        TokLitFloat f   -> f
-        TokLitChar c    -> c
-        TokLitString s  -> s
+        TokLitInteger i -> pretty $ i
+        TokLitFloat f -> pretty $ f
+        TokLitChar c -> pretty $ c
+        TokLitString s -> pretty $ s
         TokCase     -> "case"
         TokClass    -> "class"
         TokData     -> "data"
@@ -422,17 +428,17 @@ instance Outputable Token where
         TokAt       -> "@"
         TokTilde    -> "~"
         TokPredArrow -> "=>"
-        TokVarId id           -> id
-        TokQualVarId qual id  -> qual <>  "." <> id
-        TokConId id           -> id
-        TokQualConId qual id  -> qual <>  "." <> id
-        TokVarSym sym         -> sym
-        TokQualVarSym qual id -> qual <>  "." <> id
-        TokConSym sym         -> sym
-        TokQualConSym qual id -> qual <>  "." <> id
+        TokVarId id           -> pretty id
+        TokQualVarId qual id  -> pretty $ qual <>  "." <> id
+        TokConId id           -> pretty id
+        TokQualConId qual id  -> pretty $ qual <>  "." <> id
+        TokVarSym sym         -> pretty sym
+        TokQualVarSym qual id -> pretty $ qual <>  "." <> id
+        TokConSym sym         -> pretty sym
+        TokQualConSym qual id -> pretty $ qual <>  "." <> id
         TokEOF -> "<end of file>"
         TokIndent -> "<indentation>"
 
 showTokenPretty :: Token -> String
-showTokenPretty = output . quotes . ppr
+showTokenPretty = T.unpack . output . squotes . pretty
 }

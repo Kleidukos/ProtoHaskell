@@ -2,9 +2,12 @@
 
 module Compiler.BasicTypes.Unique where
 
+import Control.Concurrent.Counter (Counter)
+import Control.Concurrent.Counter qualified as Counter
 import Effectful
-import Effectful.State.Static.Local
-import Utils.Outputable (Outputable (ppr), text)
+import Effectful.Reader.Static
+import Effectful.Reader.Static qualified as Reader
+import Prettyprinter
 
 data Unique = Unique !UniqueSection !Int
   deriving (Eq, Ord, Show)
@@ -20,14 +23,23 @@ data UniqueSection
   | FastStringSection
   deriving (Eq, Ord, Show, Enum, Bounded)
 
-newtype UniqueSupply = UniqueSupply {uniques :: [Unique]}
-  deriving newtype (Eq, Show)
+data UniqueSupply = UniqueSupply
+  { section :: !UniqueSection
+  , counter :: !Counter
+  }
+  deriving stock (Eq)
 
-mkUniqueSupply :: UniqueSection -> UniqueSupply
-mkUniqueSupply pass = UniqueSupply $ map (Unique pass) [0 ..]
+mkUniqueSupply :: UniqueSection -> IO UniqueSupply
+mkUniqueSupply section = do
+  counter <- Counter.new 0
+  pure $ UniqueSupply section counter
 
--- nextUnique :: (State UniqueSupply :> es) => Eff es Unique
--- nextUnique = state (\(UniqueSupply s) -> (head s, UniqueSupply $ tail s))
+nextUnique :: (Reader UniqueSupply :> es, IOE :> es) => Eff es Unique
+nextUnique = do
+  (UniqueSupply section counter) <- Reader.ask
+  newUniqueInt <- liftIO $ Counter.get counter
+  liftIO $ Counter.set counter (newUniqueInt + 1)
+  pure $ Unique section newUniqueInt
 
 class HasUnique a where
   getUnique :: a -> Unique
@@ -35,13 +47,13 @@ class HasUnique a where
 instance HasUnique Unique where
   getUnique = id
 
-instance Outputable UniqueSection where
-  ppr ParseSection = text "p"
-  ppr RenameSection = text "rn"
-  ppr TypeCheckSection = text "tc"
-  ppr DesugarSection = text "ds"
-  ppr SimplifySection = text "simpl"
-  ppr FastStringSection = text "fs"
+instance Pretty UniqueSection where
+  pretty ParseSection = "p"
+  pretty RenameSection = "rn"
+  pretty TypeCheckSection = "tc"
+  pretty DesugarSection = "ds"
+  pretty SimplifySection = "simpl"
+  pretty FastStringSection = "fs"
 
-instance Outputable Unique where
-  ppr (Unique pass num) = ppr pass <> ppr num
+instance Pretty Unique where
+  pretty (Unique pass num) = pretty pass <> pretty num

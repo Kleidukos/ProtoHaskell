@@ -14,48 +14,16 @@ extra-source-files:
   ChangeLog.md
   README.md
 
-source-repository head
-  type:     git
-  location: https://github.com/JKTKops/ProtoHaskell
+common ghc-options
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+    -fhide-source-paths -Wno-unused-do-bind -fshow-hole-constraints
+    -Wno-unticked-promoted-constructors -Werror=unused-imports
+    -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16
+    -Wunused-packages
 
-library
-  -- cabal-fmt: expand src/
-  exposed-modules:
-    Compiler.BasicTypes.FastString
-    Compiler.BasicTypes.Location
-    Compiler.BasicTypes.Name
-    Compiler.BasicTypes.OccName
-    Compiler.BasicTypes.ParsedName
-    Compiler.BasicTypes.SrcLoc
-    Compiler.BasicTypes.Unique
-    Compiler.BasicTypes.UniqueMap
-    Compiler.Messages
-    Compiler.Parser.Errors
-    Compiler.Parser.Helpers
-    Compiler.Parser.Lexer
-    Compiler.Parser.MegaParser
-    Compiler.Parser.Parser
-    Compiler.Parser.Pattern
-    Compiler.PhSyn.PhExpr
-    Compiler.PhSyn.PhSyn
-    Compiler.PhSyn.PhType
-    Compiler.Renamer
-    Compiler.Settings
-    Compiler.TypeChecker
-    Control.Monad.IOEnv
-    Control.Monad.Supply
-    Control.Monad.Supply.Class
-    Control.Panic
-    Data.Bag
-    Utils.MonadUtils
-    Utils.Outputable
-
-  other-modules:      Paths_ProtoHaskell
-  hs-source-dirs:     src
-  build-tool-depends:
-    , alex:alex    ^>=3.2
-    , happy:happy  ^>=1.20
-
+  default-language:   GHC2021
   default-extensions:
     ApplicativeDo
     BangPatterns
@@ -72,45 +40,65 @@ library
     TupleSections
     ViewPatterns
 
+library
+  import:             ghc-options
+
+  -- cabal-fmt: expand src/
+  exposed-modules:
+    Compiler.BasicTypes.FastString
+    Compiler.BasicTypes.Location
+    Compiler.BasicTypes.Name
+    Compiler.BasicTypes.OccName
+    Compiler.BasicTypes.ParsedName
+    Compiler.BasicTypes.SrcLoc
+    Compiler.BasicTypes.Unique
+    Compiler.BasicTypes.UniqueMap
+    Compiler.Parser.Errors
+    Compiler.Parser.Helpers
+    Compiler.Parser.Lexer
+    Compiler.Parser.MegaParser
+    Compiler.Parser.Parser
+    Compiler.Parser.Pattern
+    Compiler.PhSyn.PhExpr
+    Compiler.PhSyn.PhSyn
+    Compiler.PhSyn.PhType
+    Compiler.Renamer
+    Compiler.Settings
+    Compiler.TypeChecker
+    Control.Monad.IOEnv
+    Control.Monad.Supply
+    Control.Monad.Supply.Class
+    Control.Panic
+    Utils.MonadUtils
+    Utils.Output
+
+  other-modules:      Paths_ProtoHaskell
+  hs-source-dirs:     src
+  build-tool-depends:
+    , alex:alex    ^>=3.3
+    , happy:happy  ^>=1.20
+
   build-depends:
     , array
+    , atomic-counter
     , base                         >=4.7 && <5
     , containers
-    , directory
     , effectful-core
-    , filepath
     , megaparsec
     , mtl
-    , multiset
     , parsec
-    , pretty-simple
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
-    , text-display
-    , vector
+    , multiset
 
   default-language:   GHC2021
 
 executable phc
-  main-is:            Main.hs
-  other-modules:      Paths_ProtoHaskell
-  hs-source-dirs:     app
-  default-extensions:
-    ApplicativeDo
-    BangPatterns
-    FlexibleInstances
-    FunctionalDependencies
-    GeneralizedNewtypeDeriving
-    LambdaCase
-    MultiParamTypeClasses
-    NamedFieldPuns
-    OverloadedStrings
-    PatternGuards
-    TupleSections
-    ViewPatterns
-
-  ghc-options:        -threaded -rtsopts -with-rtsopts=-N
+  import:           ghc-options
+  main-is:          Main.hs
+  other-modules:    Paths_ProtoHaskell
+  hs-source-dirs:   app
   build-depends:
     , array
     , base                         >=4.7 && <5
@@ -125,54 +113,27 @@ executable phc
     , ProtoHaskell
     , text
 
-  default-language:   GHC2021
+  default-language: GHC2021
 
 test-suite phc-test
-  type:               exitcode-stdio-1.0
-  main-is:            Spec.hs
+  import:         ghc-options
+  type:           exitcode-stdio-1.0
+  main-is:        Spec.hs
   other-modules:
-    Compiler.Parser.LexerTest
     Compiler.Parser.ParserTest
     Compiler.RenamerTest
     Test
 
-  hs-source-dirs:     test
-  default-extensions:
-    ApplicativeDo
-    BangPatterns
-    FlexibleInstances
-    FunctionalDependencies
-    GeneralizedNewtypeDeriving
-    LambdaCase
-    MultiParamTypeClasses
-    NamedFieldPuns
-    OverloadedStrings
-    PatternGuards
-    TupleSections
-    ViewPatterns
-    ViewPatterns
-
-  ghc-options:        -threaded -rtsopts -with-rtsopts=-N
+  hs-source-dirs: test
   build-depends:
-    , array
-    , base                         >=4.7 && <5
+    , base           >=4.7 && <5
     , bytestring
-    , containers
-    , directory
     , filepath
-    , megaparsec
-    , mtl
-    , parsec
     , pretty-simple
-    , prettyprinter
-    , prettyprinter-ansi-terminal
     , ProtoHaskell
     , PyF
     , tasty
     , tasty-golden
     , tasty-hunit
     , text
-    , text-display
     , utf8-string
-
-  default-language:   GHC2021

@@ -2,38 +2,36 @@ module Compiler.Parser.ParserTest (tests) where
 
 import Prelude hiding (lex)
 
-import Compiler.Parser.Parser
-import Compiler.Settings
-
-import Test
 import Test.Tasty
+import Test.Tasty.Golden (writeBinaryFile, goldenVsFileDiff)
+import Test
+import Compiler.Parser.Parser (parse)
+import Compiler.Parser.Helpers (defaultSettings)
 
-tests :: IO [TestTree]
-tests = do
-  goldenTests <- sequence [shouldSucceed, shouldFail]
-  return [testGroup "Parser Golden Tests" goldenTests]
+tests :: TestTree
+tests = testGroup 
+        "Parser Golden Tests"
+        [ shouldSucceed ]
 
-shouldSucceed :: IO TestTree
-shouldSucceed =
-  goldenPShow
-    "Should Succeed"
-    "test/Compiler/Parser/testcases/shouldsucceed"
-    runParse
-    ( \case
-        Left _ -> FailFast "parse failed"
-        Right _ -> OK
-    )
+successfulTests :: FilePath
+successfulTests = "test/Compiler/Parser/testcases/shouldsucceed/"
 
--- pshow behaves strangely since CDoc's show instance is not derived
-shouldFail :: IO TestTree
-shouldFail =
-  goldenOutput
-    "Should Fail"
-    "test/Compiler/Parser/testcases/shouldfail"
-    runParse
-    ( \case
-        Left _ -> OK
-        Right _ -> FailFast "parse succeeded"
-    )
+shouldSucceed :: TestTree
+shouldSucceed = testGroup "Should Succeed"
+  [ goldenVsFileDiff
+    "Basic"
+    (\ref new -> ["diff", "-u", ref, new])
+    (successfulTests <> "basic.expected")
+    (successfulTests <> "basic.actual")
+    testBasic
+  ]
 
-runParse fn = parse fn defaultSettings
+testBasic :: IO ()
+testBasic = do
+  let sourceFile = successfulTests <> "basic.hs"
+  contents <- readFile sourceFile
+  result <- assertRight $ parse sourceFile defaultSettings contents
+  print result
+  writeBinaryFile (successfulTests <> "basic.actual") (show result)
+
+  

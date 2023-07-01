@@ -1,7 +1,8 @@
 module Compiler.PhSyn.PhType where
 
 import Compiler.BasicTypes.SrcLoc
-import Utils.Outputable
+import Prettyprinter
+import Data.Text (Text)
 
 type LPhType id = Located (PhType id)
 data PhType id
@@ -18,39 +19,39 @@ data PhType id
   | PhTupleTy [LPhType id]
   | PhParTy (LPhType id) -- parenthesized type
   -- See NOTE: [Par constructors in syn] in Compiler/PhSyn/PhExpr
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data BuiltInTyCon
   = UnitTyCon
   | ListTyCon
   | FunTyCon
   | TupleTyCon Int -- Int is the number of fields; so it should be >= 2
-  deriving (Show, Eq, Ord)
-
-data Pred id = IsIn id (PhType id) -- Eq a, Eq [a] etc.
   deriving (Eq, Ord, Show)
 
-instance Outputable id => Outputable (PhType id) where
-  ppr (PhVarTy id) = ppr id
-  ppr (PhBuiltInTyCon tycon) = ppr tycon
-  ppr (PhQualTy ctxt t) = case ctxt of
-    [] -> ppr t
-    [c] -> ppr c <+> text "=>" <+> ppr t
-    cs -> parens (sep (punctuate comma $ map ppr cs)) <+> text "=>" <+> ppr t
-  ppr (PhAppTy t1 t2) = ppr t1 <+> ppr t2
-  ppr (PhFunTy t1 t2) = ppr t1 <+> text "->" <+> ppr t2
-  ppr (PhListTy t) = brackets $ ppr t
-  ppr (PhTupleTy ts) = parens $ sep $ punctuate comma $ map ppr ts
-  ppr (PhParTy t) = parens $ ppr t
+data Pred id = IsIn id (PhType id) -- Eq a, Eq [a] etc.
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-instance Outputable BuiltInTyCon where
-  ppr UnitTyCon = text "()"
-  ppr ListTyCon = text "[]"
-  ppr FunTyCon = text "(->)"
-  ppr (TupleTyCon f) = parens $ hcat $ replicate (f - 1) comma
+instance (Pretty id) => Pretty (PhType id) where
+  pretty (PhVarTy id) = pretty id
+  pretty (PhBuiltInTyCon tycon) = pretty tycon
+  pretty (PhQualTy ctxt t) = case ctxt of
+    [] -> pretty t
+    [c] -> pretty c <+> pretty @Text "=>" <+> pretty t
+    cs -> parens (sep (punctuate comma $ map pretty cs)) <+> pretty @Text "=>" <+> pretty t
+  pretty (PhAppTy t1 t2) = pretty t1 <+> pretty t2
+  pretty (PhFunTy t1 t2) = pretty t1 <+> pretty @Text "->" <+> pretty t2
+  pretty (PhListTy t) = brackets $ pretty t
+  pretty (PhTupleTy ts) = parens $ sep $ punctuate comma $ map pretty ts
+  pretty (PhParTy t) = parens $ pretty t
 
-instance Outputable id => Outputable (Pred id) where
-  ppr (IsIn id t) = ppr id <+> ppr t
+instance Pretty BuiltInTyCon where
+  pretty UnitTyCon = pretty @Text "()"
+  pretty ListTyCon = pretty @Text "[]"
+  pretty FunTyCon = pretty @Text "(->)"
+  pretty (TupleTyCon f) = parens $ hcat $ replicate (f - 1) comma
+
+instance (Pretty id) => Pretty (Pred id) where
+  pretty (IsIn id t) = pretty id <+> pretty t
 
 mkLPhFunTy :: LPhType id -> LPhType id -> LPhType id
 mkLPhFunTy t1@(Located span1 _) t2@(Located span2 _) =
