@@ -3,8 +3,11 @@ module Compiler.Parser.ParserTest (tests) where
 import Prelude hiding (lex)
 
 import Test.Tasty
-import Test.Tasty.Golden (writeBinaryFile, goldenVsFileDiff)
+import Test.Tasty.Golden (goldenVsFileDiff)
 import Test
+import Data.Text.Lazy.IO qualified as TL
+
+
 import Compiler.Parser.Parser (parse)
 import Compiler.Parser.Helpers (defaultSettings)
 
@@ -31,7 +34,4 @@ testBasic = do
   let sourceFile = successfulTests <> "basic.hs"
   contents <- readFile sourceFile
   result <- assertRight $ parse sourceFile defaultSettings contents
-  print result
-  writeBinaryFile (successfulTests <> "basic.actual") (show result)
-
-  
+  TL.writeFile (successfulTests <> "basic.actual") (pShowNoColorIndent2 result)

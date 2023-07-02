@@ -7,6 +7,7 @@ import Prettyprinter
 
 import Compiler.BasicTypes.SrcLoc
 import Compiler.Parser.Lexer
+import Utils.Output
 
 prettyParseError :: ParseError -> String -> [Lexeme] -> Doc ann
 prettyParseError pe "" [] = pretty $ show pe -- Use pretty . show instead of pretty in case
@@ -27,8 +28,8 @@ prettyParseError pe src lexemes =
       spaces = hcat $ replicate (length (show line) + 1) space
       template src arrows =
         (spaces <> pipe)
-          <+> (pretty (show line) <+> pipe <+> src)
-          <+> (spaces <> pipe <+> arrows)
+          $+$ (pretty (show line) <+> pipe <+> src)
+          $+$ (spaces <> pipe <+> arrows)
    in mkErrorMessage infoAmount info pos msgs template
 
 data InfoAmount = NoInfo | Source | SourceAndLexeme | Lexeme
@@ -73,7 +74,7 @@ mkErrorMessage infoAmt info pos msgs template =
         Source -> templateSource
         SourceAndLexeme -> templateSourceAndLexeme
         Lexeme -> templateLexeme
-   in header pos <+> prettySource <+> errMsgBody msgs
+   in header pos $+$ prettySource $+$ errMsgBody msgs
   where
     getBodyAndArrowWs src =
       let col = sourceColumn pos

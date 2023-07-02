@@ -184,26 +184,26 @@ instance (Pretty id) => Pretty (PhExpr id) where
     asPrefixVar (pretty e1)
       <+> asInfixVar (pretty e2)
       <+> asPrefixVar (pretty e3)
-  pretty (NegApp e) = pretty @Text "-" <> pretty e
+  pretty (NegApp e) = "-" <> pretty e
   pretty (PhPar e) = parens $ pretty e
   pretty (PhCase scrut mg) =
-    pretty @Text "case"
+    "case"
       <+> pretty scrut
-      <+> pretty @Text "of"
-      <+> indent 2 (pretty mg)
+      <+> "of"
+      $+$ indent 2 (pretty mg)
   pretty (PhIf p t f) =
-    pretty @Text "if"
+    "if"
       <+> pretty p
-      <+> pretty @Text "then"
+      <+> "then"
       <+> pretty t
-      <+> pretty @Text "else"
+      <+> "else"
       <+> pretty f
   pretty (PhLet binds e) =
-    pretty @Text "let"
+    "let"
       <+> align (pretty binds)
-      <+> pretty @Text "in"
+      $+$ "in"
       <+> pretty e
-  pretty (PhDo stmts) = pretty @Text "do" <+> align (vcat $ map pretty stmts)
+  pretty (PhDo stmts) = "do" <+> align (vcat $ map pretty stmts)
   pretty (ExplicitTuple tupArgs) = parens $ hcat $ punctuate comma $ map pretty tupArgs
   pretty (ExplicitList elems) = brackets $ hsep $ punctuate comma $ map pretty elems
   pretty (ArithSeq info) = brackets $ pretty info
@@ -226,14 +226,14 @@ prettyMatch ctxt (Match pats rhs) =
 
 prettyLocals :: (Pretty id) => LPhLocalBinds id -> Doc ann
 prettyLocals (unLoc -> LocalBinds [] []) = mempty
-prettyLocals (unLoc -> ls) = pretty @Text "where" <+> indent 2 (pretty ls)
+prettyLocals (unLoc -> ls) = "where" $+$ indent 2 (pretty ls)
 
 prettyRhs :: (Pretty id) => Doc ann -> LRHS id -> Doc ann
 prettyRhs ctxt (unLoc -> RHS grhs locals) = attachLocals $ prettyGrhs ctxt grhs
   where
     attachLocals
       | (unLoc -> LocalBinds [] []) <- locals = id
-      | otherwise = (<+> prettyLocals locals)
+      | otherwise = ($+$ prettyLocals locals)
 
 prettyGrhs :: (Pretty id) => Doc ann -> LPhExpr id -> Doc ann
 prettyGrhs ctxt (unLoc -> body) = ctxt <+> pretty body
@@ -264,17 +264,17 @@ instance (Pretty id) => Pretty (PhBind id) where
 instance (Pretty id) => Pretty (Stmt id) where
   pretty (SExpr e) = pretty e
   -- pretty (SGenerator pat e) = pretty pat <+> larrow <+> pretty e
-  pretty (SLet binds) = pretty @Text "let" <+> align (pretty binds)
+  pretty (SLet binds) = "let" <+> align (pretty binds)
 
 instance (Pretty id) => Pretty (ArithSeqInfo id) where
-  pretty (From e) = pretty e <+> pretty @Text ".."
-  pretty (FromThen e1 e2) = (pretty e1 <> comma) <+> pretty e2 <+> pretty @Text ".."
-  pretty (FromTo e1 e2) = pretty e1 <+> pretty @Text ".." <+> pretty e2
+  pretty (From e) = pretty e <+> ".."
+  pretty (FromThen e1 e2) = (pretty e1 <> comma) <+> pretty e2 <+> ".."
+  pretty (FromTo e1 e2) = pretty e1 <+> ".." <+> pretty e2
   pretty (FromThenTo e1 e2 e3) =
-    (pretty e1 <> comma) <+> pretty e2 <+> pretty @Text ".." <+> pretty e3
+    (pretty e1 <> comma) <+> pretty e2 <+> ".." <+> pretty e3
 
 instance (Pretty id) => Pretty (Sig id) where
-  pretty (TypeSig name t) = pretty name <+> pretty @Text "::" <+> pretty t
+  pretty (TypeSig name t) = pretty name <+> "::" <+> pretty t
 
 -- pretty (FixitySig assoc prec ids) =
 --   pretty assoc
@@ -282,6 +282,6 @@ instance (Pretty id) => Pretty (Sig id) where
 --     <+> hsep (punctuate comma $ map pretty ids)
 
 instance Pretty Assoc where
-  pretty Infix = pretty @Text "infix"
-  pretty InfixL = pretty @Text "infixl"
-  pretty InfixR = pretty @Text "infixr"
+  pretty Infix = "infix"
+  pretty InfixL = "infixl"
+  pretty InfixR = "infixr"

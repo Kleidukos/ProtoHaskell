@@ -7,6 +7,7 @@ import Compiler.BasicTypes.SrcLoc (Located, unLoc)
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhType
 import Prettyprinter
+import Utils.Output
 
 data PhModule a = Module
   { modName :: Maybe (Located Text)
@@ -40,35 +41,12 @@ instance (Pretty id) => Pretty (PhDecl id) where
     "data"
       <+> pretty name
       <+> hsep (map pretty tyvars)
-      <+> indent 2 (vcat cons)
+      $+$ indent 2 (vcat cons)
     where
       cons :: [Doc ann]
       cons = (equals <+> pretty c) : prepend pipe (map pretty cs)
       prepend :: Doc ann -> [Doc ann] -> [Doc ann]
       prepend d = map (d <+>)
-
--- pretty (ClassDecl scs name tyvar binds) =
---   let pscs = case scs of
---         [] -> mempty
---         [sc] -> pretty sc <+> darrow
---         scs -> (parens . hsep . punctuate comma $ map pretty scs) <+> darrow
---    in pretty "class"
---         <+> pscs
---         <+> pretty name
---         <+> pretty tyvar
---         <+> pretty "where"
---         <+> indent 2 (pretty binds)
--- pretty (InstDecl prds name head binds) =
---   let prettyds = case prds of
---         [] -> mempty
---         [prd] -> pretty prd <+> darrow
---         prds -> (parens . hsep . punctuate comma $ map pretty prds) <+> darrow
---    in pretty "instance"
---         <+> prettyds
---         <+> pretty name
---         <+> pretty head
---         <+> pretty "where"
---         <+> indent 2 (pretty binds)
 
 instance (Pretty id) => Pretty (ConDecl id) where
   pretty (ConDecl name argTypes) = pretty name <+> hsep (map pretty argTypes)

@@ -9,6 +9,9 @@ import Data.Char (isSymbol)
 output :: Doc ann -> Text
 output doc = renderStrict (layoutPretty defaultLayoutOptions doc)
 
+output' :: Doc ann -> Text
+output' doc = renderStrict (layoutSmart (defaultLayoutOptions) doc)
+
 prettyWhen :: Bool -> Doc ann -> Doc ann
 prettyWhen condition doc =
   if condition
@@ -38,3 +41,6 @@ dcolon = "::"
 
 arrow :: Doc ann
 arrow = "->"
+
+($+$) :: Doc ann -> Doc ann -> Doc ann
+($+$) x y = align (vsep [x, y])

@@ -89,7 +89,7 @@ module Compiler.BasicTypes.SrcLoc
   ) where
 
 import Data.Bits
-import Prettyprinter (Pretty(..), Doc(), colon, hcat, comma, parens, braces)
+import Prettyprinter (Pretty(..), Doc(), colon, hcat, comma, parens)
 
 import Compiler.BasicTypes.FastString
 import Utils.Output
@@ -454,5 +454,4 @@ cmpLocated :: (Ord a) => Located a -> Located a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
 instance (Pretty l, Pretty a) => Pretty (GenLocated l a) where
-  pretty (Located l a) =
-    braces (pretty l) <> pretty a
+  pretty (Located _l a) = pretty a

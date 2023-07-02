@@ -137,3 +137,4 @@ test-suite phc-test
     , tasty-hunit
     , text
     , utf8-string
+    , prettyprinter
