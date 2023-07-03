@@ -30,7 +30,7 @@ import Control.Arrow ((>>>))
 import Control.Monad
 import Control.Monad.Identity
 import Data.Functor (($>))
-import Prettyprinter (Doc, Pretty(..))
+import Prettyprinter (Doc, Pretty (..))
 
 import Text.Parsec hiding
   ( anyToken

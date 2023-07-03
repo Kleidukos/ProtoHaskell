@@ -151,9 +151,12 @@ renameMatchGroup matchGroup = do
 
 renameMatch :: Match ParsedName -> Renamer (Match Name)
 renameMatch match = do
-  renamedPatterns <- traverse (mapLocM renameParsedName) match.matchPats
+  renamedPatterns <- traverse (mapLocM renamePat) match.matchPats
   renamedRHS <- mapLocM renameRHS match.rhs
   pure $ Match renamedPatterns renamedRHS
+
+renamePat :: Pat ParsedName -> Renamer (Pat Name)
+renamePat = traverse renameParsedName
 
 renameRHS :: RHS ParsedName -> Renamer (RHS Name)
 renameRHS rhs = do
@@ -162,7 +165,7 @@ renameRHS rhs = do
   pure $ RHS renamedRhs renamedLocalBinds
 
 renamePhExpr :: PhExpr ParsedName -> Renamer (PhExpr Name)
-renamePhExpr expr = case expr of
+renamePhExpr = \case
   PhLit lit -> pure $ PhLit lit
   PhVar name -> PhVar <$> guardNotFound name
   PhLet binds cont -> do

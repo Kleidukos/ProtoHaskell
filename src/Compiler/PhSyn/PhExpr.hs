@@ -53,7 +53,7 @@ data MatchGroup id = MG
 
 type LMatch id = Located (Match id)
 data Match id = Match
-  { matchPats :: [Located id]
+  { matchPats :: [LPat id]
   , rhs :: LRHS id
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
@@ -98,20 +98,21 @@ isCaseOrLamCtxt CaseCtxt = True
 isCaseOrLamCtxt LamCtxt = True
 isCaseOrLamCtxt _ = False
 
--- type LPat id = Located (Pat id)
+type LPat id = Located (Pat id)
+
 --
 -- -- TODO: constructor for infix pattern, like x:xs or gexpr `Guard` body
 -- -- Alternatively we could just let that fall under PCon.
--- data Pat id
---   = PVar id
---   | PCon id [Pat id]
+data Pat id
+  = PVar id
+  | ParPat (Pat id) -- Parenthesized pattern, see NOTE: [Par constructors in syn]
+  | PCon id [Pat id]
+  | PTuple [Pat id]
+  | PLit PhLit
+  | PWildCard
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 --   | PAs id (Pat id)
---   | PLit PhLit
---   | PWild
---   | PTuple [Pat id]
 --   | PList [Pat id]
---   | ParPat (Pat id) -- Parenthesized pattern, see NOTE: [Par constructors in syn]
---   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LPhLocalBinds id = Located (PhLocalBinds id)
 data PhLocalBinds id = LocalBinds [LPhBind id] [LSig id]
@@ -128,10 +129,10 @@ type LStmt id = Located (Stmt id)
 data Stmt id
   = -- | exp
     SExpr (LPhExpr id)
-  | -- \| let bindings
-
-    -- | -- | pat <- exp
+  | -- \| pat <- exp
     --   SGenerator (LPat id) (LPhExpr id)
+
+    -- | let bindings
     SLet (LPhLocalBinds id)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
@@ -217,6 +218,15 @@ instance Pretty PhLit where
 
 instance (Pretty id) => Pretty (MatchGroup id) where
   pretty (MG (map unLoc -> alts) ctxt) = vcat $ map (prettyMatch ctxt) alts
+
+instance (Pretty id) => Pretty (Pat id) where
+  pretty (PVar ident) = asPrefixVar (pretty ident)
+  pretty (PCon ident args) = asPrefixVar (pretty ident) <+> hsep (map pretty args)
+  pretty (PTuple ps) = parens $ sep $ punctuate comma $ map pretty ps
+  pretty (ParPat pat) = parens $ pretty pat
+  pretty (PLit pat) = pretty pat
+  pretty PWildCard = "_"
+
 
 prettyMatch :: (Pretty id) => MatchContext -> Match id -> Doc ann
 prettyMatch ctxt (Match pats rhs) =

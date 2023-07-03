@@ -1,10 +1,10 @@
 module Utils.Output where
 
+import Data.Char (isSymbol)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Prettyprinter
 import Prettyprinter.Render.Text (renderStrict)
-import Data.Char (isSymbol)
 
 output :: Doc ann -> Text
 output doc = renderStrict (layoutPretty defaultLayoutOptions doc)
@@ -15,9 +15,9 @@ output' doc = renderStrict (layoutSmart (defaultLayoutOptions) doc)
 prettyWhen :: Bool -> Doc ann -> Doc ann
 prettyWhen condition doc =
   if condition
-  then doc
-  else mempty
-    
+    then doc
+    else mempty
+
 prettyUnless :: Bool -> Doc ann -> Doc ann
 prettyUnless condition doc = prettyWhen (not condition) doc
 

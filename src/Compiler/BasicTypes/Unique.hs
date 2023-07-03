@@ -41,12 +41,6 @@ nextUnique = do
   liftIO $ Counter.set counter (newUniqueInt + 1)
   pure $ Unique section newUniqueInt
 
-class HasUnique a where
-  getUnique :: a -> Unique
-
-instance HasUnique Unique where
-  getUnique = id
-
 instance Pretty UniqueSection where
   pretty ParseSection = "p"
   pretty RenameSection = "rn"

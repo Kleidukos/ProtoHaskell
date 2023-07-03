@@ -1,8 +1,8 @@
 module Compiler.PhSyn.PhType where
 
 import Compiler.BasicTypes.SrcLoc
-import Prettyprinter
 import Data.Text (Text)
+import Prettyprinter
 
 type LPhType id = Located (PhType id)
 data PhType id

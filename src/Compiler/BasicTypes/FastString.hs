@@ -71,9 +71,6 @@ instance Monoid FastString where
 instance Show FastString where
   show = unpackFS
 
-instance HasUnique FastString where
-  getUnique = fs_uniq
-
 instance Pretty FastString where
   pretty fs = pretty fs.fs_text
 
@@ -130,7 +127,7 @@ mkZFastString = mkFastZString . error "TODO: zEncodeString" {-zEncodeString-} . 
 --------------------------------------------------------------------------------------
 
 lengthFS :: FastString -> Int
-lengthFS = fromIntegral . T.length . fs_text
+lengthFS = T.length . fs_text
 
 nullFS :: FastString -> Bool
 nullFS = T.null . fs_text

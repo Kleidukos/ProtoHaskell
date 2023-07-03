@@ -35,7 +35,7 @@ module Compiler.BasicTypes.OccName
 
     -- * NameSpace predicates
   , isVarNameSpace
-  , isTvNameSpace
+  , isTyVarNameSpace
   , isDataConNameSpace
   , isValNameSpace
   , isTcClsNameSpace
@@ -50,7 +50,6 @@ import Data.Text (Text)
 
 import Compiler.BasicTypes.FastString
 import Compiler.BasicTypes.SrcLoc
-import Compiler.BasicTypes.Unique
 import Prettyprinter
 
 {- NOTE: [Names in PHC]
@@ -90,9 +89,6 @@ instance HasOccName OccName where
 instance HasSrcSpan OccName where
   srcSpanOf occ = occ.occNameSrcSpan
 
-instance HasUnique OccName where
-  getUnique occ = getUnique occ.nameFS
-
 -- N.B. while it is possible to define HasOccName a => HasUnique a, we should NOT do this.
 -- occname uniques are from the fast string, and don't actually uniquely identify whatever
 -- entity might /contain/ the OccName. Entities with OccNames typically have a Name, and the
@@ -122,7 +118,7 @@ mkClsOccName = mkOccName clsName
 data NameSpace
   = VarName -- variables
   | DataName -- data constructors
-  | TvName -- type variables
+  | TyVarName -- type variables
   | TcClsName -- Type constructors / type classes
   deriving (Eq, Ord, Show)
 
@@ -137,13 +133,13 @@ tcClsName = TcClsName
 
 varName = VarName
 dataName = DataName
-tvName = TvName
+tvName = TyVarName
 
 isVarNameSpace :: NameSpace -> Bool
-isVarNameSpace ns = ns `elem` [VarName, TvName]
+isVarNameSpace ns = ns `elem` [VarName, TyVarName]
 
-isTvNameSpace :: NameSpace -> Bool
-isTvNameSpace = (== TvName)
+isTyVarNameSpace :: NameSpace -> Bool
+isTyVarNameSpace = (== TyVarName)
 
 isDataConNameSpace :: NameSpace -> Bool
 isDataConNameSpace = (== DataName)
@@ -155,10 +151,10 @@ isTcClsNameSpace :: NameSpace -> Bool
 isTcClsNameSpace = (== TcClsName)
 
 prettyNameSpace :: NameSpace -> Doc ann
-prettyNameSpace VarName =  "variable"
-prettyNameSpace DataName =  "data constructor"
-prettyNameSpace TvName =  "type variable"
-prettyNameSpace TcClsName =  "type constructor or class"
+prettyNameSpace VarName = "variable"
+prettyNameSpace DataName = "data constructor"
+prettyNameSpace TyVarName = "type variable"
+prettyNameSpace TcClsName = "type constructor or class"
 
 -- | Namespaces are related if they can occur in the same contexts
 --   This will be useful later for guessing what a user meant
@@ -169,8 +165,8 @@ nameSpacesRelated ns1 ns2 = ns1 == ns2 || ns1 == otherNameSpace ns2
 otherNameSpace :: NameSpace -> NameSpace
 otherNameSpace VarName = DataName
 otherNameSpace DataName = VarName
-otherNameSpace TvName = TcClsName
-otherNameSpace TcClsName = TvName
+otherNameSpace TyVarName = TcClsName
+otherNameSpace TcClsName = TyVarName
 
 instance Pretty NameSpace where
   pretty = prettyNameSpace
@@ -183,7 +179,7 @@ isVarOccName :: OccName -> Bool
 isVarOccName (OccName ns _ _) = isVarNameSpace ns
 
 isTyVarOccName :: OccName -> Bool
-isTyVarOccName (OccName ns _ _) = isTvNameSpace ns
+isTyVarOccName (OccName ns _ _) = isTyVarNameSpace ns
 
 isDataConOccName :: OccName -> Bool
 isDataConOccName (OccName ns _ _) = isDataConNameSpace ns

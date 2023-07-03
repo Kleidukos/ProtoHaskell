@@ -18,7 +18,6 @@ import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 import Prettyprinter
 
-
 -- | A 'Name' identifies an entity.
 -- It appears in the AST after the Renamer has turned all 'ParsedName's
 -- into 'Name's. Two names are compared by their 'uniq' field.
@@ -44,18 +43,15 @@ data NameSort
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 instance Pretty NameSort where
-  pretty Internal =  "internal"
+  pretty Internal = "internal"
   -- pretty External (Module _pkg name) =  "external" <+> parens (text name)
-  pretty System =  "system"
+  pretty System = "system"
 
 instance HasSrcSpan Name where
   srcSpanOf name = srcSpanOf $ name.occ
 
 instance HasOccName Name where
   occNameOf name = name.occ
-
-instance HasUnique Name where
-  getUnique name = name.uniq
 
 nameSrcLoc :: Name -> SrcLoc
 nameSrcLoc name = srcSpanStart name.occ.occNameSrcSpan

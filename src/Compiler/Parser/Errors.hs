@@ -1,9 +1,9 @@
 module Compiler.Parser.Errors (prettyParseError) where
 
-import Text.Parsec.Error
-import Text.Parsec.Pos
 import Data.Char
 import Prettyprinter
+import Text.Parsec.Error
+import Text.Parsec.Pos
 
 import Compiler.BasicTypes.SrcLoc
 import Compiler.Parser.Lexer

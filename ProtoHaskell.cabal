@@ -52,22 +52,19 @@ library
     Compiler.BasicTypes.ParsedName
     Compiler.BasicTypes.SrcLoc
     Compiler.BasicTypes.Unique
-    Compiler.BasicTypes.UniqueMap
     Compiler.Parser.Errors
     Compiler.Parser.Helpers
     Compiler.Parser.Lexer
     Compiler.Parser.MegaParser
     Compiler.Parser.Parser
     Compiler.Parser.Pattern
+    Compiler.PhCore
     Compiler.PhSyn.PhExpr
     Compiler.PhSyn.PhSyn
     Compiler.PhSyn.PhType
     Compiler.Renamer
     Compiler.Settings
     Compiler.TypeChecker
-    Control.Monad.IOEnv
-    Control.Monad.Supply
-    Control.Monad.Supply.Class
     Control.Panic
     Utils.MonadUtils
     Utils.Output
@@ -86,11 +83,11 @@ library
     , effectful-core
     , megaparsec
     , mtl
+    , multiset
     , parsec
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
-    , multiset
 
   default-language:   GHC2021
 
@@ -105,10 +102,7 @@ executable phc
     , containers
     , directory
     , filepath
-    , megaparsec
-    , mtl
     , parsec
-    , prettyprinter
     , prettyprinter-ansi-terminal
     , ProtoHaskell
     , text
@@ -127,8 +121,6 @@ test-suite phc-test
   hs-source-dirs: test
   build-depends:
     , base           >=4.7 && <5
-    , bytestring
-    , filepath
     , pretty-simple
     , ProtoHaskell
     , PyF
@@ -136,5 +128,3 @@ test-suite phc-test
     , tasty-golden
     , tasty-hunit
     , text
-    , utf8-string
-    , prettyprinter

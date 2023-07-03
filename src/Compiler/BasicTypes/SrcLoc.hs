@@ -89,7 +89,7 @@ module Compiler.BasicTypes.SrcLoc
   ) where
 
 import Data.Bits
-import Prettyprinter (Pretty(..), Doc(), colon, hcat, comma, parens)
+import Prettyprinter (Doc (), Pretty (..), colon, comma, hcat, parens)
 
 import Compiler.BasicTypes.FastString
 import Utils.Output
