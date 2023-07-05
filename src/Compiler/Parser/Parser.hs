@@ -25,8 +25,8 @@ import Compiler.PhSyn.PhType
 parse :: SourceName -> Settings -> String -> Either (Doc ann) (PhModule ParsedName)
 parse srcname flags input = do
   lexemes <- Bifunctor.first pretty $ lex srcname input
-  case runParser (modl <* eof) srcname flags lexemes of
-    Right modl -> Right modl
+  case runParser (moduleParser <* eof) srcname flags lexemes of
+    Right parsedModule -> Right parsedModule
     Left parseErr -> Left $ prettyParseError parseErr input lexemes
 
 -----------------------------------------------------------------------------------------
@@ -34,11 +34,11 @@ parse srcname flags input = do
 -----------------------------------------------------------------------------------------
 {-HLINT ignore "Use <$>" -}
 
-modl :: Parser (PhModule ParsedName)
-modl = Module <$> optionMaybe modlHeader <*> parseTopDecls
+moduleParser :: Parser (PhModule ParsedName)
+moduleParser = Module <$> optionMaybe moduleHeader <*> parseTopDecls
 
-modlHeader :: Parser (Located Text)
-modlHeader = do
+moduleHeader :: Parser (Located Text)
+moduleHeader = do
   reserved "module"
   name <- modlName
   reserved "where"
@@ -111,7 +111,6 @@ parseFunBinding = do
 
 parsePatternBinding :: Parser (PhBind ParsedName)
 parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
-
 
 -- parsePatternBinding :: Parser (PhBind ParsedName)
 -- parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
@@ -228,11 +227,11 @@ matchCtx2Parser =
 parseExpr :: Parser (PhExpr ParsedName)
 parseExpr =
   do
-    exp <- locate parseInfixExp
+    expression <- locate parseInfixExp
     mCType <- optionMaybe $ reservedOp "::" >> parseContextType
     return $ case mCType of
-      Nothing -> unLoc exp
-      Just ty -> Typed ty exp
+      Nothing -> unLoc expression
+      Just ty -> Typed ty expression
     <?> "expression"
 
 parseLocExpr :: Parser (LPhExpr ParsedName)
@@ -343,14 +342,14 @@ parseExprParen = do
   exps <- commaSep1 parseLocExpr
   return $ case exps of
     -- () is a GCon
-    [exp] -> PhPar exp
-    exps -> ExplicitTuple exps
+    [expression] -> PhPar expression
+    expressions -> ExplicitTuple expressions
 
 parseExprBracket :: Parser (PhExpr ParsedName)
 parseExprBracket = do
   exps <- commaSep1 $ locate parseExpr
   case exps of
-    [exp] -> parseDotsSeq exp <|> return (ExplicitList [exp])
+    [expression] -> parseDotsSeq expression <|> return (ExplicitList [expression])
     [e1, e2] -> parseCommaSeq e1 e2 <|> return (ExplicitList [e1, e2])
     _ -> return $ ExplicitList exps
 
@@ -366,13 +365,13 @@ parseCommaSeq e1 e2 =
       Just e -> FromThenTo e1 e2 e
 
 parseDotsSeq :: LPhExpr ParsedName -> Parser (PhExpr ParsedName)
-parseDotsSeq exp =
+parseDotsSeq expression =
   ArithSeq <$> do
     reservedOp ".."
     e2 <- optionMaybe parseLocExpr
     return $ case e2 of
-      Nothing -> From exp
-      Just e -> FromTo exp e
+      Nothing -> From expression
+      Just e -> FromTo expression e
 
 parseDoStmts :: Parser [LStmt ParsedName]
 parseDoStmts = block1 parseDoStmt

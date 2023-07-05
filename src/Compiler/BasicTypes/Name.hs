@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module Compiler.BasicTypes.Name
@@ -11,11 +12,16 @@ module Compiler.BasicTypes.Name
   , isValName
   , isVarName
   , isSystemName
+  , mkTypeName
+  , mkTermName
   ) where
 
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
+import Data.Text
+import Effectful
+import Effectful.Reader.Static (Reader)
 import Prettyprinter
 
 -- | A 'Name' identifies an entity.
@@ -25,7 +31,6 @@ data Name = Name
   { sort :: NameSort
   , occ :: !OccName
   , uniq :: !Unique -- N.B. this unique disambiguates OccNames with the same unique
-  -- because all OccNames with the same text share a unique.
   }
   deriving stock (Show)
 
@@ -78,5 +83,19 @@ isSystemName :: Name -> Bool
 isSystemName Name{sort = System} = True
 isSystemName _ = False
 
+mkTermName :: (Reader UniqueSupply :> es, IOE :> es) => Text -> Eff es Name
+mkTermName fsName = do
+  let occ = mkVarOccName (UnhelpfulSpan "") fsName
+  let sort = Internal
+  uniq <- nextUnique
+  pure $ Name{..}
+
+mkTypeName :: (Reader UniqueSupply :> es, IOE :> es) => Text -> Eff es Name
+mkTypeName fsName = do
+  let occ = mkTcOccName (UnhelpfulSpan "") fsName
+  let sort = Internal
+  uniq <- nextUnique
+  pure $ Name{..}
+
 instance Pretty Name where
-  pretty Name{occ = name} = pretty name
+  pretty Name{occ} = pretty occ

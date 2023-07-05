@@ -123,6 +123,7 @@ test-suite phc-test
   other-modules:
     Compiler.ParserTest
     Compiler.RenamerTest
+    Compiler.TypeCheckerTest
     Test
 
   hs-source-dirs: test
@@ -135,3 +136,4 @@ test-suite phc-test
     , tasty-golden
     , tasty-hunit
     , text
+    , containers

@@ -4,20 +4,20 @@ import Compiler.BasicTypes.SrcLoc
 import Data.Text (Text)
 import Prettyprinter
 
-type LPhType id = Located (PhType id)
-data PhType id
+type LPhType name = Located (PhType name)
+data PhType name
   = -- Type variable or type constructor
-    PhVarTy id
+    PhVarTy name
   | PhBuiltInTyCon BuiltInTyCon -- Built in type constructors: (), [], (->), (,), (,,) ...
   | -- | -- Context => type
     --   PhQualTy
-    --     [Pred id] -- context (C in C => A)
-    --     (LPhType id) -- payload (A in C => A)
-    PhAppTy (LPhType id) (LPhType id)
-  | PhFunTy (LPhType id) (LPhType id)
-  | PhListTy (LPhType id)
-  | PhTupleTy [LPhType id]
-  | PhParTy (LPhType id) -- parenthesized type
+    --     [Pred name] -- context (C in C => A)
+    --     (LPhType name) -- payload (A in C => A)
+    PhAppTy (LPhType name) (LPhType name)
+  | PhFunTy (LPhType name) (LPhType name)
+  | PhListTy (LPhType name)
+  | PhTupleTy [LPhType name]
+  | PhParTy (LPhType name) -- parenthesized type
   -- See NOTE: [Par constructors in syn] in Compiler/PhSyn/PhExpr
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
@@ -28,11 +28,11 @@ data BuiltInTyCon
   | TupleTyCon Int -- Int is the number of fields; so it should be >= 2
   deriving (Eq, Ord, Show)
 
-data Pred id = IsIn id (PhType id) -- Eq a, Eq [a] etc.
+data Pred name = IsIn name (PhType name) -- Eq a, Eq [a] etc.
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-instance (Pretty id) => Pretty (PhType id) where
-  pretty (PhVarTy id) = pretty id
+instance (Pretty name) => Pretty (PhType name) where
+  pretty (PhVarTy name) = pretty name
   pretty (PhBuiltInTyCon tycon) = pretty tycon
   -- pretty (PhQualTy ctxt t) = case ctxt of
   -- [] -> pretty t
@@ -50,13 +50,13 @@ instance Pretty BuiltInTyCon where
   pretty FunTyCon = pretty @Text "(->)"
   pretty (TupleTyCon f) = parens $ hcat $ replicate (f - 1) comma
 
-instance (Pretty id) => Pretty (Pred id) where
-  pretty (IsIn id t) = pretty id <+> pretty t
+instance (Pretty name) => Pretty (Pred name) where
+  pretty (IsIn name t) = pretty name <+> pretty t
 
-mkLPhFunTy :: LPhType id -> LPhType id -> LPhType id
+mkLPhFunTy :: LPhType name -> LPhType name -> LPhType name
 mkLPhFunTy t1@(Located span1 _) t2@(Located span2 _) =
   Located (combineSrcSpans span1 span2) (PhFunTy t1 t2)
 
-mkLPhAppTy :: LPhType id -> LPhType id -> LPhType id
+mkLPhAppTy :: LPhType name -> LPhType name -> LPhType name
 mkLPhAppTy t1@(Located span1 _) t2@(Located span2 _) =
   Located (combineSrcSpans span1 span2) (PhAppTy t1 t2)

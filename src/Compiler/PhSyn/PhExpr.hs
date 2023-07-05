@@ -9,33 +9,33 @@ import GHC.Records
 import Prettyprinter
 import Utils.Output
 
-type LPhExpr id = Located (PhExpr id)
-data PhExpr id
-  = PhVar id
+type LPhExpr name = Located (PhExpr name)
+data PhExpr name
+  = PhVar name
   | PhLit PhLit
-  | PhLam (MatchGroup id)
-  | PhApp (LPhExpr id) (LPhExpr id)
+  | PhLam (MatchGroup name)
+  | PhApp (LPhExpr name) (LPhExpr name)
   | OpApp
-      (LPhExpr id) -- left operand
-      (LPhExpr id) -- operator, ALWAYS a PhVar
-      (LPhExpr id) -- right operand
-  | NegApp (LPhExpr id)
+      (LPhExpr name) -- left operand
+      (LPhExpr name) -- operator, ALWAYS a PhVar
+      (LPhExpr name) -- right operand
+  | NegApp (LPhExpr name)
   | -- Parenthesized expr, see NOTE: [Par constructors in syn]
-    PhPar (LPhExpr id)
-  | PhCase (LPhExpr id) (MatchGroup id)
+    PhPar (LPhExpr name)
+  | PhCase (LPhExpr name) (MatchGroup name)
   | PhIf
-      (LPhExpr id) -- predicate
-      (LPhExpr id) -- consequent
-      (LPhExpr id) -- alternative
-  | PhLet (LPhLocalBinds id) (LPhExpr id)
-  | PhDo [LStmt id]
-  | ExplicitTuple [LPhTupArg id]
-  | ExplicitList [LPhExpr id]
-  | ArithSeq (ArithSeqInfo id)
-  | Typed (LPhType id) (LPhExpr id)
+      (LPhExpr name) -- predicate
+      (LPhExpr name) -- consequent
+      (LPhExpr name) -- alternative
+  | PhLet (LPhLocalBinds name) (LPhExpr name)
+  | PhDo [LStmt name]
+  | ExplicitTuple [LPhTupArg name]
+  | ExplicitList [LPhExpr name]
+  | ArithSeq (ArithSeqInfo name)
+  | Typed (LPhType name) (LPhExpr name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-mkLPhAppExpr :: LPhExpr id -> LPhExpr id -> LPhExpr id
+mkLPhAppExpr :: LPhExpr name -> LPhExpr name -> LPhExpr name
 mkLPhAppExpr e1@(Located s1 _) e2@(Located s2 _) =
   Located (combineSrcSpans s1 s2) (PhApp e1 e2)
 
@@ -46,23 +46,23 @@ data PhLit
   | LitString Text
   deriving (Eq, Ord, Show)
 
-data MatchGroup id = MG
-  { alternatives :: [LMatch id]
+data MatchGroup name = MG
+  { alternatives :: [LMatch name]
   , context :: MatchContext
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-type LMatch id = Located (Match id)
-data Match id = Match
-  { matchPats :: [LPat id]
-  , rhs :: LRHS id
+type LMatch name = Located (Match name)
+data Match name = Match
+  { matchPats :: [LPat name]
+  , rhs :: LRHS name
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-type LRHS id = Located (RHS id)
-data RHS id = RHS
-  { expr :: LPhExpr id
-  , localBinds :: LPhLocalBinds id -- where clause
+type LRHS name = Located (RHS name)
+data RHS name = RHS
+  { expr :: LPhExpr name
+  , localBinds :: LPhLocalBinds name -- where clause
   -- There is technically a distinction between "no local bindings" and
   -- "empty local bindings", syntactically, but semantically they are the same.
   -- So the pretty-printer won't print them. Messages printed from source would
@@ -83,8 +83,8 @@ a GRHS uniformly later.
 -- have one GRHS per guard, which is shaped like GRHS [LGuardStmt] LPhExpr
 -- where LGuardStmt is just an LStmt (same as statements in a do-block, meaning distinguished
 -- by the context). Then RHS contains a [LGRHS] instead of just an LGRHS.
-type LGuard id = Located (Guard id)
-data Guard id = Guard (LPhExpr id) (LPhExpr id)
+type LGuard name = Located (Guard name)
+data Guard name = Guard (LPhExpr name) (LPhExpr name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data MatchContext
@@ -99,38 +99,38 @@ isCaseOrLamCtxt CaseCtxt = True
 isCaseOrLamCtxt LamCtxt = True
 isCaseOrLamCtxt _ = False
 
-type LPat id = Located (Pat id)
+type LPat name = Located (Pat name)
 
 --
 -- -- TODO: constructor for infix pattern, like x:xs or gexpr `Guard` body
 -- -- Alternatively we could just let that fall under PCon.
-data Pat id
-  = PVar id
-  | ParPat (Pat id) -- Parenthesized pattern, see NOTE: [Par constructors in syn]
-  | PCon id [Pat id]
-  | PTuple [Pat id]
+data Pat name
+  = PVar name
+  | ParPat (Pat name) -- Parenthesized pattern, see NOTE: [Par constructors in syn]
+  | PCon name [Pat name]
+  | PTuple [Pat name]
   | PLit PhLit
   | PWildCard
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-type LPhLocalBinds id = Located (PhLocalBinds id)
-data PhLocalBinds id = LocalBinds [LPhBind id] [LSig id]
+type LPhLocalBinds name = Located (PhLocalBinds name)
+data PhLocalBinds name = LocalBinds [LPhBind name] [LSig name]
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-type LPhBind id = Located (PhBind id)
-data PhBind id
+type LPhBind name = Located (PhBind name)
+data PhBind name
   = -- | f x = e
-    FunBind id (MatchGroup id)
-    -- | let Just x = …
+    FunBind name (MatchGroup name)
+  | -- | let Just x = …
     -- or foo = 3
-  | PatBind (LPat id) (LRHS id)
+    PatBind (LPat name) (LRHS name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-instance HasField "name" (PhBind id) (Maybe id) where
+instance HasField "name" (PhBind name) (Maybe name) where
   getField (FunBind name _) = Just name
   getField (PatBind pat _) = getName $ unLoc pat
 
-getName :: Pat id -> Maybe id
+getName :: Pat name -> Maybe name
 getName = \case
   PVar name -> Just name
   ParPat pat -> getName pat
@@ -139,32 +139,32 @@ getName = \case
   PLit _ -> Nothing
   PWildCard -> Nothing
 
-type LStmt id = Located (Stmt id)
-data Stmt id
+type LStmt name = Located (Stmt name)
+data Stmt name
   = -- | exp
-    SExpr (LPhExpr id)
+    SExpr (LPhExpr name)
   | -- \| pat <- exp
-    --   SGenerator (LPat id) (LPhExpr id)
+    --   SGenerator (LPat name) (LPhExpr name)
 
     -- | let bindings
-    SLet (LPhLocalBinds id)
+    SLet (LPhLocalBinds name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- This will become more interesting if we implement TupleSections
-type LPhTupArg id = LPhExpr id
+type LPhTupArg name = LPhExpr name
 
-data ArithSeqInfo id
-  = From (LPhExpr id)
+data ArithSeqInfo name
+  = From (LPhExpr name)
   | FromThen
-      (LPhExpr id)
-      (LPhExpr id)
+      (LPhExpr name)
+      (LPhExpr name)
   | FromTo
-      (LPhExpr id)
-      (LPhExpr id)
+      (LPhExpr name)
+      (LPhExpr name)
   | FromThenTo
-      (LPhExpr id)
-      (LPhExpr id)
-      (LPhExpr id)
+      (LPhExpr name)
+      (LPhExpr name)
+      (LPhExpr name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 {- NOTE: [Par constructors in syn]
@@ -179,9 +179,9 @@ we simply ensure that we generate the correct PhPar wrappers.
 
 -}
 
-type LSig id = Located (Sig id)
-data Sig id
-  = TypeSig id (LPhType id)
+type LSig name = Located (Sig name)
+data Sig name
+  = TypeSig name (LPhType name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data Assoc = Infix | InfixL | InfixR deriving (Eq, Ord, Show, Enum, Bounded)
@@ -190,8 +190,8 @@ data Assoc = Infix | InfixL | InfixR deriving (Eq, Ord, Show, Enum, Bounded)
 -- Pretty instances
 ----------------------------------------------------------------------------------
 
-instance (Pretty id) => Pretty (PhExpr id) where
-  pretty (PhVar id) = pretty id
+instance (Pretty name) => Pretty (PhExpr name) where
+  pretty (PhVar name) = pretty name
   pretty (PhLit lit) = pretty lit
   pretty (PhLam mg) = pretty mg
   pretty (PhApp e1 e2) = asPrefixVar (pretty e1) <+> asPrefixVar (pretty e2)
@@ -230,68 +230,68 @@ instance Pretty PhLit where
   pretty (LitChar c) = pretty '\'' <> pretty c <> pretty '\''
   pretty (LitString s) = pretty $ show s -- need show to do escaping
 
-instance (Pretty id) => Pretty (MatchGroup id) where
+instance (Pretty name) => Pretty (MatchGroup name) where
   pretty (MG (map unLoc -> alts) ctxt) = vcat $ map (prettyMatch ctxt) alts
 
-instance (Pretty id) => Pretty (Pat id) where
-  pretty (PVar ident) = asPrefixVar (pretty ident)
-  pretty (PCon ident args) = asPrefixVar (pretty ident) <+> hsep (map pretty args)
+instance (Pretty name) => Pretty (Pat name) where
+  pretty (PVar nameent) = asPrefixVar (pretty nameent)
+  pretty (PCon nameent args) = asPrefixVar (pretty nameent) <+> hsep (map pretty args)
   pretty (PTuple ps) = parens $ sep $ punctuate comma $ map pretty ps
   pretty (ParPat pat) = parens $ pretty pat
   pretty (PLit pat) = pretty pat
   pretty PWildCard = "_"
 
-prettyMatch :: (Pretty id) => MatchContext -> Match id -> Doc ann
+prettyMatch :: (Pretty name) => MatchContext -> Match name -> Doc ann
 prettyMatch ctxt (Match pats rhs) =
   prettyWhen (ctxt == LamCtxt) backslash
     <> hsep (map pretty pats)
     <+> prettyRhs (if isCaseOrLamCtxt ctxt then arrow else equals) rhs
 
-prettyLocals :: (Pretty id) => LPhLocalBinds id -> Doc ann
+prettyLocals :: (Pretty name) => LPhLocalBinds name -> Doc ann
 prettyLocals (unLoc -> LocalBinds [] []) = mempty
 prettyLocals (unLoc -> ls) = "where" $+$ indent 2 (pretty ls)
 
-prettyRhs :: (Pretty id) => Doc ann -> LRHS id -> Doc ann
+prettyRhs :: (Pretty name) => Doc ann -> LRHS name -> Doc ann
 prettyRhs ctxt (unLoc -> RHS grhs locals) = attachLocals $ prettyGrhs ctxt grhs
   where
     attachLocals
       | (unLoc -> LocalBinds [] []) <- locals = id
       | otherwise = ($+$ prettyLocals locals)
 
-prettyGrhs :: (Pretty id) => Doc ann -> LPhExpr id -> Doc ann
+prettyGrhs :: (Pretty name) => Doc ann -> LPhExpr name -> Doc ann
 prettyGrhs ctxt (unLoc -> body) = ctxt <+> pretty body
 
 -- prettyGrhs ctxt (unLoc -> Guarded guards) = vcat $ map (prettyGuard ctxt) guards
 
-prettyGuard :: (Pretty id) => Doc ann -> LGuard id -> Doc ann
+prettyGuard :: (Pretty name) => Doc ann -> LGuard name -> Doc ann
 prettyGuard ctxt (unLoc -> Guard guard body) = pipe <+> pretty guard <+> ctxt <+> pretty body
 
-instance (Pretty id) => Pretty (PhLocalBinds id) where
+instance (Pretty name) => Pretty (PhLocalBinds name) where
   pretty (LocalBinds binds sigs) = vcat (map pretty binds ++ map pretty sigs)
 
-instance (Pretty id) => Pretty (PhBind id) where
+instance (Pretty name) => Pretty (PhBind name) where
   pretty (FunBind name mg) = pretty name <+> pretty mg
   pretty (PatBind pat body) = pretty pat <+> prettyRhs "=" body
 
-instance (Pretty id) => Pretty (Stmt id) where
+instance (Pretty name) => Pretty (Stmt name) where
   pretty (SExpr e) = pretty e
   -- pretty (SGenerator pat e) = pretty pat <+> larrow <+> pretty e
   pretty (SLet binds) = "let" <+> align (pretty binds)
 
-instance (Pretty id) => Pretty (ArithSeqInfo id) where
+instance (Pretty name) => Pretty (ArithSeqInfo name) where
   pretty (From e) = pretty e <+> ".."
   pretty (FromThen e1 e2) = (pretty e1 <> comma) <+> pretty e2 <+> ".."
   pretty (FromTo e1 e2) = pretty e1 <+> ".." <+> pretty e2
   pretty (FromThenTo e1 e2 e3) =
     (pretty e1 <> comma) <+> pretty e2 <+> ".." <+> pretty e3
 
-instance (Pretty id) => Pretty (Sig id) where
+instance (Pretty name) => Pretty (Sig name) where
   pretty (TypeSig name t) = pretty name <+> "::" <+> pretty t
 
--- pretty (FixitySig assoc prec ids) =
+-- pretty (FixitySig assoc prec names) =
 --   pretty assoc
 --     <+> int prec
---     <+> hsep (punctuate comma $ map pretty ids)
+--     <+> hsep (punctuate comma $ map pretty names)
 
 instance Pretty Assoc where
   pretty Infix = "infix"

@@ -1,4 +1,4 @@
-module Compiler.ParserTest (tests) where
+module Compiler.ParserTest (spec) where
 
 import Prelude hiding (lex)
 
@@ -10,8 +10,8 @@ import Test.Tasty.Golden (goldenVsFileDiff)
 import Compiler.Parser.Helpers (defaultSettings)
 import Compiler.Parser.Parser (parse)
 
-tests :: TestTree
-tests =
+spec :: TestTree
+spec =
   testGroup
     "Parser Golden Tests"
     [shouldSucceed]

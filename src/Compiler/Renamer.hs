@@ -3,7 +3,7 @@
 -- |
 -- The Renamer is tasked with:
 -- 1. Turning 'ParsedName's into 'Name's.
--- 2. lexical analysis like:
+-- 2. semantic analysis like:
 --   * out-of-scope variables
 --   * unused bindings
 --   * unused imports
@@ -223,7 +223,7 @@ renamePhBind (FunBind name matchGroup) = do
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
     FunBind renamedName renamedMatchGroup
-renamePhBind (PatBind pat body) = do  
+renamePhBind (PatBind pat body) = do
   renamedName <- traverse renamePat pat
   renamedBody <- traverse renameRHS body
   pure $ PatBind renamedName renamedBody
