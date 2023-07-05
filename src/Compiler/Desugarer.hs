@@ -1,0 +1,53 @@
+-- {-# LANGUAGE DataKinds #-}
+module Compiler.Desugarer where
+
+--
+-- import Compiler.BasicTypes.Name
+-- import Compiler.BasicTypes.Unique
+-- import Compiler.PhSyn.PhExpr
+-- import Effectful
+-- import Effectful.Reader.Static (Reader)
+-- import Compiler.PhSyn.PhSyn
+-- import Compiler.PhCore
+--
+-- type Desugarer = Eff '[Reader UniqueSupply, IOE]
+--
+-- runANF :: PhModule Name -> IO LetExpr
+-- runANF ast = do
+--   uniqueSupply <- mkUniqueSupply DesugaringSection
+--   let action = anfStatement ast (contForStatement ast)
+--   action
+--     & Reader.runReader uniqueSupply
+--     & runEff
+--
+-- anfStatement
+--   :: AST.AST Name
+--   -> (ImmediateExpr -> Desugarer LetExpr)
+--   -> Desugarer LetExpr
+-- anfStatement statement cont = case statement of
+--   AST.Return expr -> anfExpr expr cont
+--
+-- contForStatement :: AST.AST Name -> (ImmediateExpr -> Desugarer LetExpr)
+-- contForStatement = \case
+--   AST.Return _expr -> (\ie -> pure $ Halt $ CoreImmediateExpr ie)
+--
+-- anfExpr
+--   :: AST.PlumeExpr Name
+--   -> (ImmediateExpr -> Desugarer LetExpr)
+--   -> Desugarer LetExpr
+-- anfExpr e cont = case e of
+--   AST.Var name -> cont (ImmVar name)
+--   AST.Lit (AST.LitInt i) -> cont (ImmNum i)
+--   AST.Addition left right ->
+--     anfExpr left $ \leftImm ->
+--       anfExpr right $ \rightImm -> do
+--         supply <- Reader.ask
+--         uniq <- liftIO $ nextUnique supply
+--         let ident = "add_" <> displayUnique uniq
+--         let identName = term uniq ident
+--         contResult <- cont (ImmVar identName)
+--         pure $
+--           ALet
+--             identName
+--             (Addition leftImm rightImm)
+--             contResult

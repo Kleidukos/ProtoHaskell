@@ -100,7 +100,7 @@ parseBinding :: Parser (LPhDecl ParsedName)
 parseBinding = locate . fmap Binding $ parseBind
 
 parseBind :: Parser (PhBind ParsedName)
-parseBind = parseFunBinding
+parseBind = try parseFunBinding <|> parsePatternBinding
 
 -- TODO: parse bindings for operators
 parseFunBinding :: Parser (PhBind ParsedName)
@@ -108,6 +108,10 @@ parseFunBinding = do
   funName <- varid
   match <- locate $ parseMatch FunCtxt
   return $ FunBind funName $ MG{alternatives = [match], context = FunCtxt}
+
+parsePatternBinding :: Parser (PhBind ParsedName)
+parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
+
 
 -- parsePatternBinding :: Parser (PhBind ParsedName)
 -- parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
@@ -142,7 +146,7 @@ parseFunBinding = do
 -- See also: 'parseRHS'
 parseMatch :: MatchContext -> Parser (Match ParsedName)
 parseMatch ctx = do
-  pats <- many Pattern.parseLocated
+  pats <- many1 Pattern.parseLocated
   rhs <- locate $ parseRHS ctx
   return Match{matchPats = pats, rhs}
 
@@ -398,11 +402,13 @@ parseCaseAlts = MG <$> (block1 . locate $ parseMatch CaseCtxt) <*> pure CaseCtxt
 -- | Parses a type with context, like Eq a => a -> a -> Bool
 parseContextType :: Parser (LPhType ParsedName)
 parseContextType = locate $ do
-  mctx <- optionMaybe $ try $ parseContext <* reservedOp "=>"
+  -- mctx <- optionMaybe $ try $ parseContext <* reservedOp "=>"
   ty <- parseType
-  return $ case mctx of
-    Nothing -> unLoc ty
-    Just preds -> PhQualTy preds ty
+  pure $ unLoc ty
+
+-- return $ case mctx of
+--   Nothing -> unLoc ty
+--   Just preds -> PhQualTy preds ty
 
 -- | Parses a context, but NOT the predicate arrow, =>
 parseContext :: Parser [Pred ParsedName]

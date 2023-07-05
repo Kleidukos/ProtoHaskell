@@ -98,7 +98,7 @@ instance Pretty OccName where
   pretty (OccName _ _ fs) = pretty fs
 
 mkOccName :: NameSpace -> SrcSpan -> Text -> OccName
-mkOccName ns span txt = OccName ns span (mkFastStringText txt)
+mkOccName ns srcSpan txt = OccName ns srcSpan (mkFastStringText txt)
 
 mkVarOccName :: SrcSpan -> Text -> OccName
 mkVarOccName = mkOccName varName

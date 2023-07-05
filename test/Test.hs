@@ -1,17 +1,17 @@
-module Test (
-  assertRight,
-  assertRenamerError,
-  pShowNoColorIndent2,
-) where
+module Test
+  ( assertRight
+  , assertRenamerError
+  , pShowNoColorIndent2
+  ) where
 
 import Test.Tasty.HUnit
 
 import Data.Text.Lazy qualified as TL
 
-import Text.Pretty.Simple
 import Compiler.Renamer (RenamerError)
+import Text.Pretty.Simple
 
-pShowNoColorIndent2 :: Show a => a -> TL.Text
+pShowNoColorIndent2 :: (Show a) => a -> TL.Text
 pShowNoColorIndent2 =
   pShowOpt
     defaultOutputOptionsDarkBg

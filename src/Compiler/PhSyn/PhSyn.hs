@@ -22,6 +22,10 @@ data PhDecl id
   | DataDecl id [id] [ConDecl id]
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+isBinding :: PhDecl id -> Bool
+isBinding (Binding _) = True
+isBinding _ = False
+
 -- This will become more interesting when we add records
 data ConDecl id
   = ConDecl id [PhType id]

@@ -9,11 +9,11 @@ data PhType id
   = -- Type variable or type constructor
     PhVarTy id
   | PhBuiltInTyCon BuiltInTyCon -- Built in type constructors: (), [], (->), (,), (,,) ...
-  | -- Context => type
-    PhQualTy
-      [Pred id] -- context (C in C => A)
-      (LPhType id) -- payload (A in C => A)
-  | PhAppTy (LPhType id) (LPhType id)
+  | -- | -- Context => type
+    --   PhQualTy
+    --     [Pred id] -- context (C in C => A)
+    --     (LPhType id) -- payload (A in C => A)
+    PhAppTy (LPhType id) (LPhType id)
   | PhFunTy (LPhType id) (LPhType id)
   | PhListTy (LPhType id)
   | PhTupleTy [LPhType id]
@@ -34,10 +34,10 @@ data Pred id = IsIn id (PhType id) -- Eq a, Eq [a] etc.
 instance (Pretty id) => Pretty (PhType id) where
   pretty (PhVarTy id) = pretty id
   pretty (PhBuiltInTyCon tycon) = pretty tycon
-  pretty (PhQualTy ctxt t) = case ctxt of
-    [] -> pretty t
-    [c] -> pretty c <+> pretty @Text "=>" <+> pretty t
-    cs -> parens (sep (punctuate comma $ map pretty cs)) <+> pretty @Text "=>" <+> pretty t
+  -- pretty (PhQualTy ctxt t) = case ctxt of
+  -- [] -> pretty t
+  -- [c] -> pretty c <+> pretty @Text "=>" <+> pretty t
+  -- cs -> parens (sep (punctuate comma $ map pretty cs)) <+> pretty @Text "=>" <+> pretty t
   pretty (PhAppTy t1 t2) = pretty t1 <+> pretty t2
   pretty (PhFunTy t1 t2) = pretty t1 <+> pretty @Text "->" <+> pretty t2
   pretty (PhListTy t) = brackets $ pretty t

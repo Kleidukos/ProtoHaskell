@@ -5,6 +5,7 @@ import Data.Text (Text)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.PhSyn.PhType
 
+import GHC.Records
 import Prettyprinter
 import Utils.Output
 
@@ -111,8 +112,6 @@ data Pat id
   | PLit PhLit
   | PWildCard
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
---   | PAs id (Pat id)
---   | PList [Pat id]
 
 type LPhLocalBinds id = Located (PhLocalBinds id)
 data PhLocalBinds id = LocalBinds [LPhBind id] [LSig id]
@@ -121,9 +120,24 @@ data PhLocalBinds id = LocalBinds [LPhBind id] [LSig id]
 type LPhBind id = Located (PhBind id)
 data PhBind id
   = -- | f x = e
-    -- id = f, mg = ([PVar x], body = b)
     FunBind id (MatchGroup id)
+    -- | let Just x = …
+    -- or foo = 3
+  | PatBind (LPat id) (LRHS id)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+instance HasField "name" (PhBind id) (Maybe id) where
+  getField (FunBind name _) = Just name
+  getField (PatBind pat _) = getName $ unLoc pat
+
+getName :: Pat id -> Maybe id
+getName = \case
+  PVar name -> Just name
+  ParPat pat -> getName pat
+  PCon name _ -> Just name
+  PTuple _ -> Nothing
+  PLit _ -> Nothing
+  PWildCard -> Nothing
 
 type LStmt id = Located (Stmt id)
 data Stmt id
@@ -227,7 +241,6 @@ instance (Pretty id) => Pretty (Pat id) where
   pretty (PLit pat) = pretty pat
   pretty PWildCard = "_"
 
-
 prettyMatch :: (Pretty id) => MatchContext -> Match id -> Doc ann
 prettyMatch ctxt (Match pats rhs) =
   prettyWhen (ctxt == LamCtxt) backslash
@@ -253,23 +266,12 @@ prettyGrhs ctxt (unLoc -> body) = ctxt <+> pretty body
 prettyGuard :: (Pretty id) => Doc ann -> LGuard id -> Doc ann
 prettyGuard ctxt (unLoc -> Guard guard body) = pipe <+> pretty guard <+> ctxt <+> pretty body
 
--- instance (Pretty id) => Pretty (Pat id) where
---   pretty (PVar id) = asPrefixVar (pretty id)
---   pretty (PCon id args) = asPrefixVar (pretty id) <+> hsep (map pretty args)
---   pretty (PAs id pat) = asPrefixVar (pretty id) <> pretty '@' <> pretty pat
---   pretty (PLit lit) = pretty lit
---   pretty PWild = pretty '_'
---   pretty (PTuple ps) = parens $ fsep $ punctuate comma $ map pretty ps
---   pretty (PList ps) = brackets . fsep . punctuate comma $ map pretty ps
---   pretty (ParPat pat) = parens $ pretty pat
-
 instance (Pretty id) => Pretty (PhLocalBinds id) where
   pretty (LocalBinds binds sigs) = vcat (map pretty binds ++ map pretty sigs)
 
 instance (Pretty id) => Pretty (PhBind id) where
-  pretty (FunBind id mg) = pretty id <+> pretty mg
-
--- pretty (PatBind pat body) = pretty pat <+> prettyRhs (text "=") body
+  pretty (FunBind name mg) = pretty name <+> pretty mg
+  pretty (PatBind pat body) = pretty pat <+> prettyRhs "=" body
 
 instance (Pretty id) => Pretty (Stmt id) where
   pretty (SExpr e) = pretty e

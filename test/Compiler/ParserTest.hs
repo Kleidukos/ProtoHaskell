@@ -1,51 +1,53 @@
-module Compiler.Parser.ParserTest (tests) where
+module Compiler.ParserTest (tests) where
 
 import Prelude hiding (lex)
 
+import Data.Text.Lazy.IO qualified as TL
+import Test
 import Test.Tasty
 import Test.Tasty.Golden (goldenVsFileDiff)
-import Test
-import Data.Text.Lazy.IO qualified as TL
 
-
-import Compiler.Parser.Parser (parse)
 import Compiler.Parser.Helpers (defaultSettings)
+import Compiler.Parser.Parser (parse)
 
 tests :: TestTree
-tests = testGroup 
-        "Parser Golden Tests"
-        [ shouldSucceed ]
+tests =
+  testGroup
+    "Parser Golden Tests"
+    [shouldSucceed]
 
 successfulTests :: FilePath
-successfulTests = "test/Compiler/Parser/testcases/shouldsucceed/"
+successfulTests = "test/fixtures/Parser/testcases/shouldsucceed/"
 
 shouldSucceed :: TestTree
-shouldSucceed = testGroup "Should Succeed"
-  [ goldenVsFileDiff
-    "Basic"
-    (\ref new -> ["diff", "-u", ref, new])
-    (successfulTests <> "basic.expected")
-    (successfulTests <> "basic.actual")
-    testBasic
-  , goldenVsFileDiff
-    "Geometry"
-    (\ref new -> ["diff", "-u", ref, new])
-    (successfulTests <> "geometry.expected")
-    (successfulTests <> "geometry.actual")
-    testGeometry
-  , goldenVsFileDiff
-    "Local"
-    (\ref new -> ["diff", "-u", ref, new])
-    (successfulTests <> "local.expected")
-    (successfulTests <> "local.actual")
-    testLocal
-  , goldenVsFileDiff
-    "Operators"
-    (\ref new -> ["diff", "-u", ref, new])
-    (successfulTests <> "operators.expected")
-    (successfulTests <> "operators.actual")
-    testOperators
-  ]
+shouldSucceed =
+  testGroup
+    "Should Succeed"
+    [ goldenVsFileDiff
+        "Basic"
+        (\ref new -> ["diff", "-u", ref, new])
+        (successfulTests <> "basic.expected")
+        (successfulTests <> "basic.actual")
+        testBasic
+    , goldenVsFileDiff
+        "Geometry"
+        (\ref new -> ["diff", "-u", ref, new])
+        (successfulTests <> "geometry.expected")
+        (successfulTests <> "geometry.actual")
+        testGeometry
+    , goldenVsFileDiff
+        "Local"
+        (\ref new -> ["diff", "-u", ref, new])
+        (successfulTests <> "local.expected")
+        (successfulTests <> "local.actual")
+        testLocal
+    , goldenVsFileDiff
+        "Operators"
+        (\ref new -> ["diff", "-u", ref, new])
+        (successfulTests <> "operators.expected")
+        (successfulTests <> "operators.actual")
+        testOperators
+    ]
 
 testBasic :: IO ()
 testBasic = do

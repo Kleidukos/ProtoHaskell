@@ -10,7 +10,7 @@ output :: Doc ann -> Text
 output doc = renderStrict (layoutPretty defaultLayoutOptions doc)
 
 output' :: Doc ann -> Text
-output' doc = renderStrict (layoutSmart (defaultLayoutOptions) doc)
+output' doc = renderStrict (layoutSmart defaultLayoutOptions doc)
 
 prettyWhen :: Bool -> Doc ann -> Doc ann
 prettyWhen condition doc =

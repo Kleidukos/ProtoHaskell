@@ -14,6 +14,9 @@ extra-source-files:
   ChangeLog.md
   README.md
 
+common rts-options
+  ghc-options: -rtsopts
+
 common ghc-options
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
@@ -27,6 +30,7 @@ common ghc-options
   default-extensions:
     ApplicativeDo
     BangPatterns
+    DataKinds
     DerivingStrategies
     FlexibleInstances
     FunctionalDependencies
@@ -52,6 +56,7 @@ library
     Compiler.BasicTypes.ParsedName
     Compiler.BasicTypes.SrcLoc
     Compiler.BasicTypes.Unique
+    Compiler.Desugarer
     Compiler.Parser.Errors
     Compiler.Parser.Helpers
     Compiler.Parser.Lexer
@@ -65,7 +70,6 @@ library
     Compiler.Renamer
     Compiler.Settings
     Compiler.TypeChecker
-    Control.Panic
     Utils.MonadUtils
     Utils.Output
 
@@ -85,6 +89,7 @@ library
     , mtl
     , multiset
     , parsec
+    , pretty-simple
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
@@ -93,6 +98,7 @@ library
 
 executable phc
   import:           ghc-options
+  import:           rts-options
   main-is:          Main.hs
   other-modules:    Paths_ProtoHaskell
   hs-source-dirs:   app
@@ -111,10 +117,11 @@ executable phc
 
 test-suite phc-test
   import:         ghc-options
+  import:         rts-options
   type:           exitcode-stdio-1.0
   main-is:        Spec.hs
   other-modules:
-    Compiler.Parser.ParserTest
+    Compiler.ParserTest
     Compiler.RenamerTest
     Test
 
