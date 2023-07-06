@@ -184,6 +184,9 @@ data Sig name
   = TypeSig name (LPhType name)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+instance HasField "name" (Sig name) name where
+  getField (TypeSig name _) = name
+
 data Assoc = Infix | InfixL | InfixR deriving (Eq, Ord, Show, Enum, Bounded)
 
 ----------------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 module Compiler.TypeCheckerTest where
 
+import Data.Map.Strict qualified as Map
 import Test.Tasty
 import Test.Tasty.HUnit
-import Data.Map.Strict qualified as Map
 
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName hiding (varName)
@@ -17,13 +17,15 @@ spec :: TestTree
 spec =
   testGroup
     "Type checker"
-    [ testGroup "Type synthesis for literals"
-          [ testCase "String" testTypeSynthesisOnStringLiteral
-          , testCase "Char" testTypeSynthesisOnCharLiteral
-          , testCase "Int" testTypeSynthesisOnIntLiteral
-          , testCase "Float" testTypeSynthesisOnFloatLiteral
-          ]
-    , testGroup "Type checking"
+    [ testGroup
+        "Type synthesis for literals"
+        [ testCase "String" testTypeSynthesisOnStringLiteral
+        , testCase "Char" testTypeSynthesisOnCharLiteral
+        , testCase "Int" testTypeSynthesisOnIntLiteral
+        , testCase "Float" testTypeSynthesisOnFloatLiteral
+        ]
+    , testGroup
+        "Type checking"
         [ testCase "Var lookup" testLookupVar
         , testCase "Expression with type annotation" testAnnotatedExpr
         ]
@@ -132,30 +134,30 @@ testTypeSynthesisOnFloatLiteral = do
 testLookupVar :: Assertion
 testLookupVar = do
   let varName =
-          Name
-            { sort = Internal
-            , occ =
-                OccName
-                  { nameSpace = VarName
-                  , occNameSrcSpan = UnhelpfulSpan ""
-                  , nameFS = "myVar"
-                  }
-            , uniq = Unique TypeCheckSection 0
-            }
+        Name
+          { sort = Internal
+          , occ =
+              OccName
+                { nameSpace = VarName
+                , occNameSrcSpan = UnhelpfulSpan ""
+                , nameFS = "myVar"
+                }
+          , uniq = Unique TypeCheckSection 0
+          }
   let var = PhVar varName
 
   let expectedType =
         PhVarTy $
-            Name
-              { sort = Internal
-              , occ =
-                  OccName
-                    { nameSpace = TcClsName
-                    , occNameSrcSpan = UnhelpfulSpan ""
-                    , nameFS = "Float"
-                    }
-              , uniq = Unique TypeCheckSection 1
-              }
+          Name
+            { sort = Internal
+            , occ =
+                OccName
+                  { nameSpace = TcClsName
+                  , occNameSrcSpan = UnhelpfulSpan ""
+                  , nameFS = "Float"
+                  }
+            , uniq = Unique TypeCheckSection 1
+            }
   let environment = Environment $ Map.singleton varName expectedType
   result <-
     assertRight
@@ -170,29 +172,29 @@ testLookupVar = do
 testAnnotatedExpr :: Assertion
 testAnnotatedExpr = do
   let varName =
+        Name
+          { sort = Internal
+          , occ =
+              OccName
+                { nameSpace = VarName
+                , occNameSrcSpan = UnhelpfulSpan ""
+                , nameFS = "myOtherVar"
+                }
+          , uniq = Unique TypeCheckSection 0
+          }
+
+  let expectedType =
+        PhVarTy $
           Name
             { sort = Internal
             , occ =
                 OccName
-                  { nameSpace = VarName
+                  { nameSpace = TcClsName
                   , occNameSrcSpan = UnhelpfulSpan ""
-                  , nameFS = "myOtherVar"
+                  , nameFS = "Int"
                   }
-            , uniq = Unique TypeCheckSection 0
+            , uniq = Unique TypeCheckSection 1
             }
-
-  let expectedType =
-        PhVarTy $
-            Name
-              { sort = Internal
-              , occ =
-                  OccName
-                    { nameSpace = TcClsName
-                    , occNameSrcSpan = UnhelpfulSpan ""
-                    , nameFS = "Int"
-                    }
-              , uniq = Unique TypeCheckSection 1
-              }
 
   let var = Typed (Located noSrcSpan expectedType) (Located noSrcSpan (PhVar varName))
 

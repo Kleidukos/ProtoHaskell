@@ -129,6 +129,7 @@ test-suite phc-test
   hs-source-dirs: test
   build-depends:
     , base           >=4.7 && <5
+    , containers
     , pretty-simple
     , ProtoHaskell
     , PyF
@@ -136,4 +137,3 @@ test-suite phc-test
     , tasty-golden
     , tasty-hunit
     , text
-    , containers

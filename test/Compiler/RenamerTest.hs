@@ -3,7 +3,7 @@
 
 module Compiler.RenamerTest where
 
--- import Data.Text.Lazy.IO qualified as TL
+import Data.Text.Lazy.IO qualified as TL
 import PyF
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -15,6 +15,7 @@ import Compiler.BasicTypes.SrcLoc
 import Compiler.Parser.Parser (parse)
 import Compiler.Renamer
 import Compiler.Settings (defaultSettings)
+import Control.Monad (void)
 import Test
 
 spec :: TestTree
@@ -24,6 +25,7 @@ spec =
     [ testCase "Rename a ParsedName into a Name" testRenameParsedName
     , testCase "Top-level bindings must have a type signature" testEnsureTopLevelBindingsHaveASignature
     , testCase "Duplicate bindings are caught" testDuplicateBindingsAreCaught
+    , testCase "Bindings with the same name in different branches" testBindingsWithSameNameInDifferentBranches
     ]
 
 testRenameParsedName :: Assertion
@@ -58,5 +60,25 @@ testDuplicateBindingsAreCaught = do
        in 3
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  -- TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
+  TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
   assertRenamerError (DuplicateBinding "x") =<< rename parsedSnippet1
+
+testBindingsWithSameNameInDifferentBranches :: Assertion
+testBindingsWithSameNameInDifferentBranches = do
+  let snippet1 =
+        [str|
+  module Snippet1 where
+    
+    bar :: String
+    bar = 
+      let x = "lol"
+       in x
+
+    otherFun :: String
+    otherFun =
+      let x = "blah"
+       in x
+  |]
+  parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  -- TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
+  void $ assertRight =<< rename parsedSnippet1
