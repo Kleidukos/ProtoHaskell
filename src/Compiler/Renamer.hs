@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 -- |
 -- The Renamer is tasked with:
 -- 1. Turning 'ParsedName's into 'Name's.
@@ -41,6 +39,7 @@ import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhSyn
 import Compiler.PhSyn.PhType
 import Data.Text.Lazy qualified as TL
+import Debug.Trace (traceShowId)
 
 data RenamerError
   = NoTopLevelSignature FastString
@@ -55,10 +54,14 @@ data RenamerContext = RenamerContext
   }
   deriving stock (Eq, Show)
 
+newtype TopLevelSignatures = TopLevelSignatures {topLevelSignatures :: Map Name (PhType Name)}
+  deriving newtype (Eq, Ord, Show, Semigroup, Monoid)
+
 type Renamer a =
   Eff
     [ Reader UniqueSupply
-    , State RenamerContext
+    , Reader RenamerContext
+    , State TopLevelSignatures
     , Error RenamerError
     , IOE
     ]
@@ -71,7 +74,8 @@ runRenamer action = do
   uniqueSupply <- mkUniqueSupply RenameSection
   action
     & Reader.runReader uniqueSupply
-    & State.evalState emptyRenamerContext
+    & Reader.runReader emptyRenamerContext
+    & State.evalState mempty
     & Error.runErrorNoCallStack
     & runEff
 
@@ -94,7 +98,8 @@ emptyRenamerContext =
 -- Simply looking up 'Name's cannot work.
 ensureTopLevelSignatures :: PhModule Name -> Renamer (PhModule Name)
 ensureTopLevelSignatures parsedModule = do
-  RenamerContext{signatures} <- State.get
+  TopLevelSignatures{topLevelSignatures=signatures} <- State.get
+  liftIO $ putStrLn $ "signatures: " <> show signatures
   parsedModule.modDecls
     & fmap unLoc
     & filter isBinding
@@ -104,6 +109,7 @@ ensureTopLevelSignatures parsedModule = do
           Binding (PatBind (Located _ (PVar name)) _) -> [name]
           _ -> []
       )
+    & traceShowId
     & mapM_
       ( \name ->
           unless (signatureMember name signatures) $
@@ -111,7 +117,6 @@ ensureTopLevelSignatures parsedModule = do
               NoTopLevelSignature name.occ.nameFS
       )
 
-  printContext "ensureTopLevelSignatures"
   pure parsedModule
 
 -- Renaming ParsedName to Name --
@@ -126,8 +131,8 @@ renameParsedName parsedName = do
           , occ = parsedNameOcc parsedName
           , uniq = unique
           }
-  addBinding name
-  pure name
+  addBinding name $
+    pure name
 
 -- | Like 'renameParsedName' but do not add it to the bindings environment
 renameSigName :: ParsedName -> Renamer Name
@@ -148,7 +153,7 @@ renamePhModule parsedModule = do
 renamePhDecl :: PhDecl ParsedName -> Renamer (PhDecl Name)
 renamePhDecl (Binding bind) = Binding <$> renamePhBind bind
 renamePhDecl (Signature sig) = do
-  renamedSignature <- renameSig sig
+  renamedSignature <- renameTopLevelSig sig
   pure $ Signature renamedSignature
 renamePhDecl decl =
   error $ "Bleh! I don't know how to rename " <> show decl
@@ -194,13 +199,21 @@ renameBinds localBinds = do
   pure $
     LocalBinds renamedBinds renamedSignatures
 
+renameTopLevelSig :: Sig ParsedName -> Renamer (Sig Name)
+renameTopLevelSig (TypeSig sigName sigType) = do
+  renamedSigName <- renameSigName sigName
+  renamedSigType <- renameSigType sigType
+  addTopLevelSignature renamedSigName (unLoc renamedSigType)
+  pure $
+    TypeSig renamedSigName renamedSigType
+
 renameSig :: Sig ParsedName -> Renamer (Sig Name)
 renameSig (TypeSig sigName sigType) = do
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
-  addSignature renamedSigName (unLoc renamedSigType)
-  pure $
-    TypeSig renamedSigName renamedSigType
+  addSignature renamedSigName (unLoc renamedSigType) $
+    pure $
+      TypeSig renamedSigName renamedSigType
 
 renameSigType :: LPhType ParsedName -> Renamer (LPhType Name)
 renameSigType =
@@ -228,27 +241,32 @@ renamePhBind (PatBind pat body) = do
   renamedBody <- traverse renameRHS body
   pure $ PatBind renamedName renamedBody
 
-addBinding :: Name -> Renamer ()
-addBinding name =
-  State.modifyM
-    ( \env -> do
-        if bindingMember name env.bindings
-          then Error.throwError $ DuplicateBinding name.occ.nameFS
-          else pure $ RenamerContext (Set.insert name env.bindings) env.signatures
-    )
+addBinding :: Name -> (Renamer a -> Renamer a)
+addBinding name action = do
+  env <- Reader.ask @RenamerContext
+  if bindingMember name env.bindings
+    then Error.throwError $ DuplicateBinding name.occ.nameFS
+    else Reader.local (const $ RenamerContext (Set.insert name env.bindings) env.signatures) action
 
-addSignature :: Name -> PhType Name -> Renamer ()
-addSignature sigName sigType =
+addSignature :: Name -> PhType Name -> (Renamer a -> Renamer a)
+addSignature sigName sigType action = do
+  env <- Reader.ask @RenamerContext
+  if signatureMember sigName env.signatures
+    then Error.throwError $ DuplicateSignature sigName.occ.nameFS
+    else Reader.local (const $ RenamerContext env.bindings (Map.insert sigName sigType env.signatures)) action
+
+addTopLevelSignature :: Name -> PhType Name -> Renamer ()
+addTopLevelSignature sigName sigType =
   State.modifyM
     ( \env -> do
-        if signatureMember sigName env.signatures
+        if signatureMember sigName env.topLevelSignatures
           then Error.throwError $ DuplicateSignature sigName.occ.nameFS
-          else pure $ RenamerContext env.bindings (Map.insert sigName sigType env.signatures)
+          else pure $ TopLevelSignatures (Map.insert sigName sigType env.topLevelSignatures)
     )
 
 guardNotFound :: ParsedName -> Renamer Name
 guardNotFound name = do
-  RenamerContext{bindings} <- State.get
+  RenamerContext{bindings} <- Reader.ask
   renamedName <- renameParsedName name
   if bindingMember renamedName bindings
     then pure renamedName
@@ -256,7 +274,7 @@ guardNotFound name = do
 
 -- | Determine if a local signature has already been processed.
 signatureMember :: Name -> Map Name (PhType Name) -> Bool
-signatureMember name sigMap =
+signatureMember name sigMap = 
   let result =
         length $
           Map.filterWithKey
@@ -279,8 +297,12 @@ bindingMember name bindings =
 
 printContext :: String -> Renamer ()
 printContext tag = do
-  context <- State.get @RenamerContext
-  liftIO $ TL.putStrLn $ pShowNoColorIndent2 [("context_" <> tag, context)]
+  context <- Reader.ask @RenamerContext
+  topLevelSignatures <- State.get @TopLevelSignatures
+  liftIO $
+    TL.putStrLn $
+      pShowNoColorIndent2 
+        [("context" <> tag, context, "top_level_signatures", topLevelSignatures)]
 
 pShowNoColorIndent2 :: (Show a) => a -> TL.Text
 pShowNoColorIndent2 =

@@ -3,7 +3,7 @@
 
 module Compiler.RenamerTest where
 
-import Data.Text.Lazy.IO qualified as TL
+-- import Data.Text.Lazy.IO qualified as TL
 import PyF
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -60,7 +60,7 @@ testDuplicateBindingsAreCaught = do
        in 3
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
+  -- TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
   assertRenamerError (DuplicateBinding "x") =<< rename parsedSnippet1
 
 testBindingsWithSameNameInDifferentBranches :: Assertion
@@ -80,5 +80,4 @@ testBindingsWithSameNameInDifferentBranches = do
        in x
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  -- TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
   void $ assertRight =<< rename parsedSnippet1

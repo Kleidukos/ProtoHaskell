@@ -11,13 +11,13 @@ import Compiler.PhSyn.PhType
 import Effectful
 import Effectful.Error.Static (Error)
 
+import Compiler.BasicTypes.SrcLoc (unLoc)
 import Data.Function ((&))
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static (Reader)
 import Effectful.Reader.Static qualified as Reader
 import Effectful.State.Static.Local (State)
 import Effectful.State.Static.Local qualified as State
-import Compiler.BasicTypes.SrcLoc (unLoc)
 
 type TypeChecker =
   Eff
