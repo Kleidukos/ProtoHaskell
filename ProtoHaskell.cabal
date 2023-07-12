@@ -68,6 +68,8 @@ library
     Compiler.PhSyn.PhSyn
     Compiler.PhSyn.PhType
     Compiler.Renamer
+    Compiler.Renamer.Types
+    Compiler.Renamer.Utils
     Compiler.Settings
     Compiler.TypeChecker
     Utils.MonadUtils
@@ -128,12 +130,14 @@ test-suite phc-test
 
   hs-source-dirs: test
   build-depends:
-    , base           >=4.7 && <5
+    , base            >=4.7 && <5
     , containers
+    , effectful-core
     , pretty-simple
     , ProtoHaskell
     , PyF
     , tasty
+    , tasty-focus
     , tasty-golden
     , tasty-hunit
     , text

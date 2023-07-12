@@ -1,21 +1,31 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module Compiler.RenamerTest where
 
 -- import Data.Text.Lazy.IO qualified as TL
+
+import Control.Monad (void)
+import Data.Map.Strict qualified as Map
+import Data.Set qualified as Set
+import Effectful.State.Static.Local qualified as State
 import PyF
 import Test.Tasty
+import Test.Tasty.Focus (focus)
 import Test.Tasty.HUnit
 
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.ParsedName
 import Compiler.BasicTypes.SrcLoc
+import Compiler.BasicTypes.Unique
 import Compiler.Parser.Parser (parse)
+import Compiler.PhSyn.PhType
 import Compiler.Renamer
+import Compiler.Renamer.Types
+import Compiler.Renamer.Utils
 import Compiler.Settings (defaultSettings)
-import Control.Monad (void)
 import Test
 
 spec :: TestTree
@@ -23,8 +33,9 @@ spec =
   testGroup
     "Renamer"
     [ testCase "Rename a ParsedName into a Name" testRenameParsedName
+    , testCase "Renaming environment utils work" testRenamingUtils
     , testCase "Top-level bindings must have a type signature" testEnsureTopLevelBindingsHaveASignature
-    , testCase "Duplicate bindings are caught" testDuplicateBindingsAreCaught
+    , focus $ testCase "Duplicate bindings are caught" testDuplicateBindingsAreCaught
     , testCase "Bindings with the same name in different branches" testBindingsWithSameNameInDifferentBranches
     ]
 
@@ -35,6 +46,47 @@ testRenameParsedName = do
   result <- assertRight =<< runRenamer (renameParsedName parsedName)
   assertEqual "Wrong sort" result.sort Internal
   assertEqual "Wrong occurence name" result.occ (mkVarOccName srcSpan "putStrLn")
+
+testRenamingUtils :: Assertion
+testRenamingUtils = do
+  let topLevelBinding1 =
+        Name
+          { sort = Internal
+          , occ = mkTcOccName noSrcSpan "bar"
+          , uniq = Unique RenameSection 0
+          }
+  Right result <- runRenamer $ do
+    addTopLevelBinding topLevelBinding1
+    State.get @TopLevelBindings
+  assertEqual
+    "Expected top-level binding"
+    result.topLevelBindings
+    (Set.singleton topLevelBinding1)
+
+  let topLevelSignatureName1 =
+        Name
+          { sort = Internal
+          , occ = mkVarOccName noSrcSpan "bar"
+          , uniq = Unique RenameSection 0
+          }
+  let topLevelSignatureType1 =
+        PhVarTy $
+          Name
+            { sort = Internal
+            , occ = mkTcOccName noSrcSpan "Int"
+            , uniq = Unique RenameSection 1
+            }
+
+  intermediateResult <- runRenamer $ do
+    addTopLevelSignature topLevelSignatureName1 topLevelSignatureType1
+    State.get @TopLevelBindings
+
+  (result' :: TopLevelBindings) <- assertRenamerRight intermediateResult
+
+  assertEqual
+    "Expected top-level signature"
+    result'.topLevelSignatures
+    (Map.singleton topLevelSignatureName1 topLevelSignatureType1)
 
 testEnsureTopLevelBindingsHaveASignature :: Assertion
 testEnsureTopLevelBindingsHaveASignature = do
