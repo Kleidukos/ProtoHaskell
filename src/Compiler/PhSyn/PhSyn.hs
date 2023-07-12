@@ -26,6 +26,10 @@ isBinding :: PhDecl id -> Bool
 isBinding (Binding _) = True
 isBinding _ = False
 
+isSignature :: PhDecl id -> Bool
+isSignature (Signature _) = True
+isSignature _ = False
+
 -- This will become more interesting when we add records
 data ConDecl id
   = ConDecl id [PhType id]
