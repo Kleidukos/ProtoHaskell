@@ -78,7 +78,7 @@ library
   other-modules:      Paths_ProtoHaskell
   hs-source-dirs:     src
   build-tool-depends:
-    , alex:alex    ^>=3.3
+    , alex:alex    ^>=3.4
     , happy:happy  ^>=1.20
 
   build-depends:
@@ -95,6 +95,7 @@ library
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
+    , vector
 
   default-language:   GHC2021
 
