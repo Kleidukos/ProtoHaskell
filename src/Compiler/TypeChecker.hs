@@ -57,11 +57,17 @@ runTypeChecker env action = do
     & Error.runErrorNoCallStack
     & runEff
 
-inferType :: PhExpr Name -> TypeChecker (PhType Name)
+inferType :: PhExpr Name -> TypeChecker TypedExpr
 inferType = \case
-  PhVar name -> lookupType name
-  PhLit lit -> synthLiteral lit
-  Typed exprType expression -> checkType (unLoc expression) (unLoc exprType)
+  PhVar name -> do
+    lookedUpType <- lookupType name
+    pure $ TypedExpr lookedUpType (PhVar name)
+  PhLit lit -> do 
+    synthesisedType <- synthLiteral lit
+    pure $ TypedExpr synthesisedType (PhLit lit)
+  Typed exprType expression -> do
+    checkedType <- checkType (unLoc expression) (unLoc exprType)
+    pure $ TypedExpr checkedType (Typed exprType expression)
 
 -- | Lookup the type of a term
 lookupType :: Name -> TypeChecker (PhType Name)
@@ -83,9 +89,16 @@ mkType name = pure $ PhVarTy name
 
 --- Checking
 
-checkType :: PhExpr Name -> PhType Name -> TypeChecker (PhType Name)
-checkType term typeToCheck = do
-  foundType <- inferType term
-  if typeToCheck == foundType
-    then pure typeToCheck
-    else Error.throwError $ TypeMismatch typeToCheck foundType
+checkType :: PhType Name -> PhExpr Name -> TypeChecker TypedExpr
+checkType typeToCheck = \case
+  PhLam matchGroup -> checkMatchGroup matchGroup
+
+checkMatchGroup :: PhType Name -> MatchGroup Name -> TypeChecker TypedExpr
+checkMatchGroup typeToCheck mg = do 
+
+checkMatch :: PhType Name -> Match Name -> TypeChecker (Match Name)
+checkMatch typeToCheck (Match pats body) =
+  case typeToCheck of
+    PhFunTy ty1 ty2 -> 
+    
+  
