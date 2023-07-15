@@ -4,11 +4,11 @@
 
 module Compiler.RenamerTest where
 
--- import Data.Text.Lazy.IO qualified as TL
-
 import Control.Monad (void)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
+import Data.Text.Lazy.IO qualified as TL
+import Data.Vector qualified as Vector
 import Effectful.State.Static.Local qualified as State
 import PyF
 import Test.Tasty
@@ -35,7 +35,7 @@ spec =
     [ testCase "Rename a ParsedName into a Name" testRenameParsedName
     , testCase "Renaming environment utils work" testRenamingUtils
     , testCase "Top-level bindings must have a type signature" testEnsureTopLevelBindingsHaveASignature
-    , focus $ testCase "Duplicate bindings are caught" testDuplicateBindingsAreCaught
+    , testCase "Duplicate bindings are caught" testDuplicateBindingsAreCaught
     , testCase "Bindings with the same name in different branches" testBindingsWithSameNameInDifferentBranches
     ]
 
@@ -112,8 +112,14 @@ testDuplicateBindingsAreCaught = do
        in 3
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  -- TL.putStrLn $ pShowNoColorIndent2 parsedSnippet1
-  assertRenamerError (DuplicateBinding "x") =<< rename parsedSnippet1
+  assertRenamerError
+    ( DuplicateBinding "x" $
+        Vector.fromList
+          [ RealSrcSpan $ mkRealSrcSpan (mkRealSrcLoc "<snippet1>" 6 11) (mkRealSrcLoc "<snippet1>" 6 20)
+          , RealSrcSpan $ mkRealSrcSpan (mkRealSrcLoc "<snippet1>" 7 11) (mkRealSrcLoc "<snippet1>" 7 20)
+          ]
+    )
+    =<< rename parsedSnippet1
 
 testBindingsWithSameNameInDifferentBranches :: Assertion
 testBindingsWithSameNameInDifferentBranches = do

@@ -142,3 +142,4 @@ test-suite phc-test
     , tasty-golden
     , tasty-hunit
     , text
+    , vector

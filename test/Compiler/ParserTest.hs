@@ -9,6 +9,7 @@ import Test.Tasty.Golden (goldenVsFileDiff)
 
 import Compiler.Parser.Helpers (defaultSettings)
 import Compiler.Parser.Parser (parse)
+import Compiler.Renamer.Utils (pShowNoColorIndent2)
 
 spec :: TestTree
 spec =

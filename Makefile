@@ -14,7 +14,7 @@ watch: ## Start a reloading REPL
 	@ghcid
 
 test: ## Run the test suite
-	@cabal test --test-show-details direct --test-options="--size-cutoff 50000"
+	@cabal test --test-show-details direct
 
 regen-golden: ## Re-generate the golden tests
 	@cabal test --test-options="--accept"

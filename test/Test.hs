@@ -2,7 +2,6 @@ module Test
   ( assertRight
   , assertRenamerError
   , assertRenamerRight
-  , pShowNoColorIndent2
   ) where
 
 import Test.Tasty.HUnit
@@ -10,16 +9,8 @@ import Test.Tasty.HUnit
 import Data.Text.Lazy qualified as TL
 
 import Compiler.Renamer (RenamerError)
+import Compiler.Renamer.Utils (pShowNoColorIndent2)
 import Effectful.Error.Static
-import Text.Pretty.Simple
-
-pShowNoColorIndent2 :: (Show a) => a -> TL.Text
-pShowNoColorIndent2 =
-  pShowOpt
-    defaultOutputOptionsDarkBg
-      { outputOptionsIndentAmount = 2
-      , outputOptionsColorOptions = Nothing
-      }
 
 assertRight
   :: (Show a, HasCallStack)

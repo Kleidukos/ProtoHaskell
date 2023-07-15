@@ -16,6 +16,8 @@ module Compiler.Renamer
 
 import Control.Monad
 import Data.Function ((&))
+import Data.List qualified as List
+import Data.Vector qualified as Vector
 import Effectful
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static qualified as Reader
@@ -35,7 +37,11 @@ import Compiler.Renamer.Types
 import Compiler.Renamer.Utils
 
 -- import Data.Text (Text)
+
+import Data.Maybe (fromJust, mapMaybe)
+import Data.Vector (Vector)
 import Effectful.Error.Static
+import Utils.MonadUtils
 
 runRenamer
   :: Renamer a
@@ -188,21 +194,38 @@ renamePhExpr = \case
   PhVar name -> PhVar <$> guardNotFound name
   PhLet binds cont -> do
     renamedBinds <- traverse renameBinds binds
-    printContext "_renamed binds"
-    -- liftIO $ print ("renamed binds" :: Text, renamedBinds)
-    renamedCont <- traverse renamePhExpr cont
+    let (names :: Vector Name) =
+          mapMaybe (((.name)) . unLoc) (renamedBinds & unLoc & (\(LocalBinds phBinds _) -> phBinds))
+            & Vector.fromList
+    renamedCont <- addBindings names $ traverse renamePhExpr cont
     pure $ PhLet renamedBinds renamedCont
   parsedExpr -> do
     renamePhExpr parsedExpr
 
 renameBinds :: PhLocalBinds ParsedName -> Renamer (PhLocalBinds Name)
-renameBinds localBinds = do
-  let LocalBinds binds signatures = localBinds
-  renamedBinds <- traverse (mapLocM renamePhBind) binds
-  printContext "_after_renaming_binds"
+renameBinds (LocalBinds binds signatures) = do
+  let groupedBinds = groupBindsByName binds
+  uniqueBinds <- guardForDuplicates groupedBinds
+  renamedBinds <- traverse (mapLocM renamePhBind) uniqueBinds
   renamedSignatures <- traverse (mapLocM renameSig) signatures
   pure $
     LocalBinds renamedBinds renamedSignatures
+
+guardForDuplicates :: [[LPhBind ParsedName]] -> Renamer [LPhBind ParsedName]
+guardForDuplicates groupedBinds =
+  concatMapM
+    ( \bindList ->
+        if length bindList > 1
+          then do
+            let duplicateName = bindList & head & unLoc & (.name) & fromJust & (.occ.nameFS)
+            let duplicateSpans = bindList & fmap getLoc & Vector.fromList
+            throwError (DuplicateBinding duplicateName duplicateSpans)
+          else pure bindList
+    )
+    groupedBinds
+
+groupBindsByName :: [LPhBind ParsedName] -> [[LPhBind ParsedName]]
+groupBindsByName binds = List.groupBy (\a b -> (unLoc a).name == (unLoc b).name) binds
 
 renamePhBind :: PhBind ParsedName -> Renamer (PhBind Name)
 renamePhBind (FunBind name matchGroup) = do
@@ -278,7 +301,9 @@ renamePhBindWithoutRegisteringName (PatBind pat body) = do
 guardNotFound :: ParsedName -> Renamer Name
 guardNotFound name = do
   RenamerContext{bindings} <- Reader.ask
-  renamedName <- renameParsedName name
+  renamedName <- renameParsedNameWithoutRegistering name
   if bindingMember renamedName bindings
     then pure renamedName
-    else Error.throwError $ BindingNotFound renamedName.occ.nameFS
+    else do
+      printContext "_guard_not_found"
+      Error.throwError $ BindingNotFound renamedName.occ.nameFS

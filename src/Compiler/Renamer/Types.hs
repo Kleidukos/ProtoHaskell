@@ -11,12 +11,14 @@ import Effectful.State.Static.Local (State)
 
 import Compiler.BasicTypes.FastString
 import Compiler.BasicTypes.Name
+import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 import Compiler.PhSyn.PhType
+import Data.Vector (Vector)
 
 data RenamerError
   = NoTopLevelSignature FastString
-  | DuplicateBinding FastString -- (Vector SrcSpan)
+  | DuplicateBinding FastString (Vector SrcSpan)
   | DuplicateSignature FastString
   | BindingNotFound FastString
   deriving stock (Eq, Show)

@@ -16,14 +16,32 @@ import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.PhSyn.PhType
 import Compiler.Renamer.Types
+import Data.Function
+import Data.Vector (Vector)
+import Data.Vector qualified as Vector
 
 addBinding :: Name -> Renamer a -> Renamer a
 addBinding name action = do
   env <- Reader.ask @RenamerContext
   TopLevelBindings{topLevelBindings} <- State.get
   if bindingMember name topLevelBindings || bindingMember name env.bindings
-    then Error.throwError $ DuplicateBinding name.occ.nameFS
+    then Error.throwError $ DuplicateBinding name.occ.nameFS (Vector.singleton $ name.occ.occNameSrcSpan)
     else Reader.local (const $ RenamerContext (Set.insert name env.bindings) env.signatures) action
+
+addBindings :: Vector Name -> Renamer a -> Renamer a
+addBindings names action = do
+  env <- Reader.ask @RenamerContext
+  TopLevelBindings{topLevelBindings} <- State.get
+  if any (\n -> bindingMember n topLevelBindings) names
+    || any (\n -> bindingMember n env.bindings) names
+    then do
+      let duplicateName = names & Vector.head & (.occ.nameFS)
+      let duplicateSpans = Vector.empty
+
+      Error.throwError $ DuplicateBinding duplicateName duplicateSpans
+    else do
+      let newBindings = Vector.foldr' Set.insert env.bindings names
+      Reader.local (const $ RenamerContext newBindings env.signatures) action
 
 addSignature :: Name -> PhType Name -> (Renamer a -> Renamer a)
 addSignature sigName sigType action = do
@@ -51,7 +69,7 @@ addTopLevelBinding name =
   State.modifyM
     ( \env -> do
         if bindingMember name env.topLevelBindings
-          then Error.throwError $ DuplicateBinding name.occ.nameFS
+          then Error.throwError $ DuplicateBinding name.occ.nameFS (Vector.singleton name.occ.occNameSrcSpan)
           else
             pure $
               TopLevelBindings
