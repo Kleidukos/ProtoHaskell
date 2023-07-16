@@ -126,6 +126,7 @@ test-suite phc-test
   main-is:        Spec.hs
   other-modules:
     Compiler.ParserTest
+    Compiler.LexerTest
     Compiler.RenamerTest
     Compiler.TypeCheckerTest
     Test

@@ -1,5 +1,6 @@
 import Test.Tasty
 
+import Compiler.LexerTest qualified as Lexer
 import Compiler.ParserTest qualified as Parser
 import Compiler.RenamerTest qualified as Renamer
 import Compiler.TypeCheckerTest qualified as TypeChecker
@@ -11,7 +12,8 @@ main =
     withFocus $
       testGroup
         "ProtoHaskell Tests"
-        [ Parser.spec
+        [ Lexer.spec
+        , Parser.spec
         , Renamer.spec
         , TypeChecker.spec
         ]

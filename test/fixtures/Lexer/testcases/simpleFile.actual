@@ -1,5 +1,110 @@
-Right [<indentation>, module, SimpleFile, where, <indentation>, foo, ::, Foo,
-       <indentation>, foo, =, undefined, <indentation>, bar, ::, (, Bar, ->,
-       Foo, ), ->, Bar, ->, Foo, <indentation>, bar, f, b, =, f, b,
-       <indentation>, bar', ::, (, Bar, ->, Foo, ), ->, Bar, ->, Foo,
-       <indentation>, bar', =, id]
+[ Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 1 1 7 ) TokModule
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 1 8 18 )
+  ( TokConId "SimpleFile" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 1 19 24 ) TokWhere
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 3 1 4 )
+  ( TokVarId "foo" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 3 5 7 ) TokDoubleColon
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 3 8 11 )
+  ( TokConId "Foo" )
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 4 1 4 )
+  ( TokVarId "foo" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 4 5 6 ) TokEqual
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 4 7 16 )
+  ( TokVarId "undefined" )
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 1 4 )
+  ( TokVarId "bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 5 7 ) TokDoubleColon
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 8 9 ) TokLParen
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 9 12 )
+  ( TokConId "Bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 13 15 ) TokRArrow
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 16 19 )
+  ( TokConId "Foo" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 19 20 ) TokRParen
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 21 23 ) TokRArrow
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 24 27 )
+  ( TokConId "Bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 28 30 ) TokRArrow
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 6 31 34 )
+  ( TokConId "Foo" )
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 7 1 4 )
+  ( TokVarId "bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 7 5 6 )
+  ( TokVarId "f" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 7 7 8 )
+  ( TokVarId "b" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 7 9 10 ) TokEqual
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 7 11 12 )
+  ( TokVarId "f" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 7 13 14 )
+  ( TokVarId "b" )
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 1 5 )
+  ( TokVarId "bar'" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 6 8 ) TokDoubleColon
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 9 10 ) TokLParen
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 10 13 )
+  ( TokConId "Bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 14 16 ) TokRArrow
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 17 20 )
+  ( TokConId "Foo" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 20 21 ) TokRParen
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 22 24 ) TokRArrow
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 25 28 )
+  ( TokConId "Bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 29 31 ) TokRArrow
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 9 32 35 )
+  ( TokConId "Foo" )
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 10 1 5 )
+  ( TokVarId "bar'" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 10 6 7 ) TokEqual
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/simpleFile.hs 10 8 10 )
+  ( TokVarId "id" )
+]

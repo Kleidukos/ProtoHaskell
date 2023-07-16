@@ -162,16 +162,16 @@ instance HasSettings (Parsec [Lexeme] ParseState) where
 {- NOTE: [Overlapping Show instance for Lexeme]
 
 For some reason, some parsec combinators seem to enforce a Show instance on Lexeme
-which they then use inside `unexepctected` messages. This is catastrophic!
+which they then use inside `unexpected` messages. This is catastrophic!
 Bonus points for switching to `Megaparsec` if version 8 can handle custom streams properly.
 
 To remedy this, we have to overlap the existing (informative) show instance for Lexeme
 in order to be able to guarantee that the user sees pretty-printed error messages.
 
 -}
--- instance {-# OVERLAPPING #-} Show (GenLocated SrcSpan Token) where
---   show (Located _ TokIndent) = "indentation"
---   show (Located _ t) = showTokenPretty t
+instance {-# OVERLAPPING #-} Show (GenLocated SrcSpan Token) where
+  show (Located _ TokIndent) = "indentation"
+  show (Located _ t) = showTokenPretty t
 
 -----------------------------------------------------------------------------------------
 -- Primitive parsers for our Tokens
@@ -342,6 +342,7 @@ openImplicit = do
 -- | Closes an implicit block. Always succeeds and modifies the LayoutContexts.
 closeImplicit = popLayoutContext
 
+
 -----------------------------------------------------------------------------------------
 -- Running Parsers
 -----------------------------------------------------------------------------------------
@@ -372,7 +373,7 @@ initPos = do
     ls -> setPosition $ posFromTok startPos undefined ls
 
 -----------------------------------------------------------------------------------------
--- Parse Names
+--  Names
 -----------------------------------------------------------------------------------------
 
 varid :: Parser ParsedName

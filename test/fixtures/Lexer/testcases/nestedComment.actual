@@ -1,1 +1,179 @@
-Right [Located (UnhelpfulSpan <no location info>) TokIndent,Located (RealSrcSpan SrcSpanOneLine test/Compiler/Lexer/testcases/nestedComment.hs 1 1 7) TokModule,Located (UnhelpfulSpan <no location info>) TokIndent,Located (RealSrcSpan SrcSpanOneLine test/Compiler/Lexer/testcases/nestedComment.hs 8 1 4) (TokVarId "foo"),Located (RealSrcSpan SrcSpanOneLine test/Compiler/Lexer/testcases/nestedComment.hs 8 5 8) (TokVarId "bar")]
+[ Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 1 2 ) TokLBracket
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 2 3 )
+  ( TokVarSym "<" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 3 14 )
+  ( TokVarId "indentation" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 14 15 )
+  ( TokVarSym ">" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 15 16 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 17 18 ) TokLBracket
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 18 19 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 20 21 )
+  ( TokVarSym "<" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 21 22 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 23 34 )
+  ( TokVarId "indentation" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 34 35 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 36 37 )
+  ( TokVarSym ">" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 37 38 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 39 40 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 40 41 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 42 43 ) TokLBracket
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 43 44 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 45 46 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 46 47 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 48 49 )
+  ( TokVarSym "<" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 49 50 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 51 52 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 52 53 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 54 65 )
+  ( TokVarId "indentation" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 65 66 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 67 68 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 68 69 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 70 71 )
+  ( TokVarSym ">" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 71 72 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 73 74 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 74 75 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 76 77 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 77 78 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 79 80 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 1 80 81 ) TokComma
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 2 8 ) TokModule
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 8 9 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 10 11 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 11 12 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 13 14 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 14 15 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 16 17 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 17 18 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 19 20 )
+  ( TokVarSym "<" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 20 21 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 22 23 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 23 24 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 25 36 )
+  ( TokVarId "indentation" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 36 37 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 38 39 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 39 40 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 41 42 )
+  ( TokVarSym ">" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 42 43 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 44 45 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 45 46 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 47 48 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 48 49 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 50 51 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 51 52 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 53 56 )
+  ( TokVarId "foo" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 56 57 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 58 59 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 59 60 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 61 62 )
+  ( TokVarSym "<" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 62 73 )
+  ( TokVarId "indentation" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 73 74 )
+  ( TokVarSym ">" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 74 75 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 76 77 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 77 78 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 79 80 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 2 80 81 ) TokComma
+, Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 2 5 )
+  ( TokVarId "bar" )
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 5 6 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 7 8 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 8 9 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 10 11 ) TokRBracket
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 11 12 ) TokComma
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 13 14 ) TokRBracket
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/nestedComment.hs 3 14 15 ) TokRBracket
+]

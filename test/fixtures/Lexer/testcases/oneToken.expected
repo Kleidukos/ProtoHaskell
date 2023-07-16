@@ -1,1 +1,4 @@
-Right [<indentation>, module]
+[ Located ( UnhelpfulSpan <no location info> ) TokIndent
+, Located
+  ( RealSrcSpan SrcSpanOneLine test/fixtures/Lexer/testcases/oneToken.hs 1 1 7 ) TokModule
+]
