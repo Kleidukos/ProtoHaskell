@@ -11,7 +11,7 @@ import Compiler.PhSyn.PhType
 import Effectful
 import Effectful.Error.Static (Error)
 
-import Compiler.BasicTypes.SrcLoc (unLoc)
+import Compiler.BasicTypes.Location
 import Data.Function ((&))
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static (Reader)
@@ -59,9 +59,9 @@ runTypeChecker env action = do
 
 inferType :: PhExpr Name -> TypeChecker (PhType Name)
 inferType = \case
-  PhVar name -> lookupType name
-  PhLit lit -> synthLiteral lit
-  Typed exprType expression -> checkType (unLoc expression) (unLoc exprType)
+  PhVar _ name -> lookupType name
+  PhLit nodeID lit -> synthLiteral nodeID lit
+  Typed _ exprType expression -> checkType expression exprType
 
 -- | Lookup the type of a term
 lookupType :: Name -> TypeChecker (PhType Name)
@@ -72,14 +72,14 @@ lookupType name = do
         [associatedType] -> pure associatedType
         _ -> Error.throwError TypeNotFound
 
-synthLiteral :: PhLit -> TypeChecker (PhType Name)
-synthLiteral (LitInt _i) = mkTypeName "Int" >>= mkType
-synthLiteral (LitFloat _f) = mkTypeName "Float" >>= mkType
-synthLiteral (LitChar _c) = mkTypeName "Char" >>= mkType
-synthLiteral (LitString _s) = mkTypeName "String" >>= mkType
+synthLiteral :: NodeID -> PhLit -> TypeChecker (PhType Name)
+synthLiteral nodeID (LitInt _i) = mkTypeName "Int" >>= mkType nodeID
+synthLiteral nodeID (LitFloat _f) = mkTypeName "Float" >>= mkType nodeID
+synthLiteral nodeID (LitChar _c) = mkTypeName "Char" >>= mkType nodeID
+synthLiteral nodeID (LitString _s) = mkTypeName "String" >>= mkType nodeID
 
-mkType :: Name -> TypeChecker (PhType Name)
-mkType name = pure $ PhVarTy name
+mkType :: NodeID -> Name -> TypeChecker (PhType Name)
+mkType nodeID name = pure $ PhVarTy nodeID name
 
 --- Checking
 

@@ -28,7 +28,6 @@ import Effectful.State.Static.Local qualified as State
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.ParsedName
-import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhSyn
@@ -45,17 +44,17 @@ import Utils.MonadUtils
 
 runRenamer
   :: Renamer a
-  -> IO (Either (CallStack, RenamerError) a)
+  -> IO (Either RenamerError a)
 runRenamer action = do
   uniqueSupply <- mkUniqueSupply RenameSection
   action
     & Reader.runReader uniqueSupply
     & Reader.runReader emptyRenamerContext
     & State.evalState emptyTopLevelContext
-    & Error.runError
+    & Error.runErrorNoCallStack
     & runEff
 
-rename :: PhModule ParsedName -> IO (Either (CallStack, RenamerError) (PhModule Name))
+rename :: PhModule ParsedName -> IO (Either RenamerError (PhModule Name))
 rename parsedModule =
   runRenamer $
     renamePhModule parsedModule
@@ -115,18 +114,17 @@ renameSigName parsedName = do
 renamePhModule :: PhModule ParsedName -> Renamer (PhModule Name)
 renamePhModule parsedModule = do
   ensureTopLevelSignatures (parsedModule.modDecls)
-  renamedDecls <- traverse (mapLocM renamePhDecl) parsedModule.modDecls
-  pure $! Module parsedModule.modName renamedDecls
+  renamedDecls <- traverse renamePhDecl parsedModule.modDecls
+  pure $! Module parsedModule.nodeID parsedModule.modName renamedDecls
 
-ensureTopLevelSignatures :: [LPhDecl ParsedName] -> Renamer ()
+ensureTopLevelSignatures :: [PhDecl ParsedName] -> Renamer ()
 ensureTopLevelSignatures decls = do
   decls
-    & fmap unLoc
     & filter (\decl -> isBinding decl || isSignature decl)
     & traverse
       ( \case
-          Binding binding -> Binding <$> renameTopLevelBinding binding
-          Signature sig -> Signature <$> renameTopLevelSig sig
+          Binding nodeID binding -> Binding nodeID <$> renameTopLevelBinding binding
+          Signature nodeID sig -> Signature nodeID <$> renameTopLevelSig sig
           _ -> undefined
       )
   TopLevelBindings{topLevelBindings, topLevelSignatures} <- State.get
@@ -149,154 +147,153 @@ ensureTopLevelSignatures decls = do
 -- of top-level type and term declaration,
 -- otherwise we would be getting duplicates.
 renamePhDecl :: PhDecl ParsedName -> Renamer (PhDecl Name)
-renamePhDecl (Binding bind) = Binding <$> renamePhBindWithoutRegisteringName bind
-renamePhDecl (Signature sig) = do
+renamePhDecl (Binding nodeID bind) = Binding nodeID <$> renamePhBindWithoutRegisteringName bind
+renamePhDecl (Signature nodeID sig) = do
   renamedSignature <- renameTopLevelSigWithoutRegistering sig
-  pure $ Signature renamedSignature
+  pure $ Signature nodeID renamedSignature
 renamePhDecl decl =
   error $ "Bleh! I don't know how to rename " <> show decl
 
 renameMatchGroup :: MatchGroup ParsedName -> Renamer (MatchGroup Name)
 renameMatchGroup matchGroup = do
-  renamedAlternatives <- traverse (mapLocM renameMatch) (matchGroup.alternatives)
-  pure $ MG renamedAlternatives matchGroup.context
+  renamedAlternatives <- traverse renameMatch (matchGroup.alternatives)
+  pure $ MG matchGroup.nodeID renamedAlternatives matchGroup.context
 
 renameMatch :: Match ParsedName -> Renamer (Match Name)
 renameMatch match = do
-  renamedPatterns <- traverse (traverse renamePat) match.matchPats
-  renamedRHS <- traverse renameRHS match.rhs
-  pure $ Match renamedPatterns renamedRHS
+  renamedPatterns <- traverse renamePat match.matchPats
+  renamedRHS <- renameRHS match.rhs
+  pure $ Match match.nodeID renamedPatterns renamedRHS
 
 renamePat :: Pat ParsedName -> Renamer (Pat Name)
-renamePat (PVar name) =
-  PVar <$> renameParsedName name
+renamePat (PVar nodeID name) =
+  PVar nodeID <$> renameParsedName name
 renamePat rest = traverse renameParsedName rest
 
 renamePatWithoutRegisteringName :: Pat ParsedName -> Renamer (Pat Name)
-renamePatWithoutRegisteringName (PVar name) =
-  PVar <$> renameParsedNameWithoutRegistering name
+renamePatWithoutRegisteringName (PVar nodeID name) =
+  PVar nodeID <$> renameParsedNameWithoutRegistering name
 renamePatWithoutRegisteringName rest = traverse renameParsedName rest
 
 renameTopLevelPat :: Pat ParsedName -> Renamer (Pat Name)
-renameTopLevelPat (PVar name) = do
-  PVar <$> renameTopLevelName name
+renameTopLevelPat (PVar nodeID name) = PVar nodeID <$> renameTopLevelName name
 renameTopLevelPat rest = traverse renameParsedName rest
 
 renameRHS :: RHS ParsedName -> Renamer (RHS Name)
 renameRHS rhs = do
-  renamedLocalBinds <- traverse renameBinds rhs.localBinds
-  renamedRhs <- traverse renamePhExpr rhs.expr
-  pure $ RHS renamedRhs renamedLocalBinds
+  renamedLocalBinds <- renameBinds rhs.localBinds
+  renamedRhs <- renamePhExpr rhs.expr
+  pure $ RHS rhs.nodeID renamedRhs renamedLocalBinds
 
 renamePhExpr :: PhExpr ParsedName -> Renamer (PhExpr Name)
 renamePhExpr = \case
-  PhLit lit -> pure $ PhLit lit
-  PhVar name -> PhVar <$> guardNotFound name
-  PhLet binds cont -> do
-    renamedBinds <- traverse renameBinds binds
+  PhLit nodeID lit -> pure $ PhLit nodeID lit
+  PhVar nodeID name -> PhVar nodeID <$> guardNotFound name
+  PhLet nodeID binds cont -> do
+    renamedBinds <- renameBinds binds
     let (names :: Vector Name) =
-          mapMaybe (((.name)) . unLoc) (renamedBinds & unLoc & (\(LocalBinds phBinds _) -> phBinds))
+          mapMaybe
+            (.name)
+            ( renamedBinds
+                & (\(LocalBinds _ phBinds _) -> phBinds)
+            )
             & Vector.fromList
-    renamedCont <- addBindings names $ traverse renamePhExpr cont
-    pure $ PhLet renamedBinds renamedCont
+    renamedCont <- addBindings names $ renamePhExpr cont
+    pure $ PhLet nodeID renamedBinds renamedCont
   parsedExpr -> do
     renamePhExpr parsedExpr
 
 renameBinds :: PhLocalBinds ParsedName -> Renamer (PhLocalBinds Name)
-renameBinds (LocalBinds binds signatures) = do
+renameBinds (LocalBinds nodeID binds signatures) = do
   let groupedBinds = groupBindsByName binds
   uniqueBinds <- guardForDuplicates groupedBinds
-  renamedBinds <- traverse (mapLocM renamePhBind) uniqueBinds
-  renamedSignatures <- traverse (mapLocM renameSig) signatures
+  renamedBinds <- traverse renamePhBind uniqueBinds
+  renamedSignatures <- traverse renameSig signatures
   pure $
-    LocalBinds renamedBinds renamedSignatures
+    LocalBinds nodeID renamedBinds renamedSignatures
 
-guardForDuplicates :: [[LPhBind ParsedName]] -> Renamer [LPhBind ParsedName]
-guardForDuplicates groupedBinds =
+guardForDuplicates :: [[PhBind ParsedName]] -> Renamer [PhBind ParsedName]
+guardForDuplicates =
   concatMapM
     ( \bindList ->
         if length bindList > 1
           then do
-            let duplicateName = bindList & head & unLoc & (.name) & fromJust & (.occ.nameFS)
-            let duplicateSpans = bindList & fmap getLoc & Vector.fromList
+            let duplicateName = bindList & head & (.name) & fromJust & (.occ.nameFS)
+            let duplicateSpans = bindList & fmap (.nodeID) & Vector.fromList
             throwError (DuplicateBinding duplicateName duplicateSpans)
           else pure bindList
     )
-    groupedBinds
 
-groupBindsByName :: [LPhBind ParsedName] -> [[LPhBind ParsedName]]
-groupBindsByName binds = List.groupBy (\a b -> (unLoc a).name == (unLoc b).name) binds
+groupBindsByName :: [PhBind ParsedName] -> [[PhBind ParsedName]]
+groupBindsByName = List.groupBy (\a b -> a.name == b.name)
 
 renamePhBind :: PhBind ParsedName -> Renamer (PhBind Name)
-renamePhBind (FunBind name matchGroup) = do
+renamePhBind (FunBind nodeID name matchGroup) = do
   renamedName <- renameParsedName name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
-    FunBind renamedName renamedMatchGroup
-renamePhBind (PatBind pat body) = do
-  renamedName <- traverse renamePat pat
-  renamedBody <- traverse renameRHS body
-  pure $ PatBind renamedName renamedBody
+    FunBind nodeID renamedName renamedMatchGroup
+renamePhBind (PatBind nodeID pat body) = do
+  renamedName <- renamePat pat
+  renamedBody <- renameRHS body
+  pure $ PatBind nodeID renamedName renamedBody
 
 renameTopLevelSig :: Sig ParsedName -> Renamer (Sig Name)
-renameTopLevelSig (TypeSig sigName sigType) = do
+renameTopLevelSig (TypeSig nodeID sigName sigType) = do
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
-  addTopLevelSignature renamedSigName (unLoc renamedSigType)
+  addTopLevelSignature renamedSigName renamedSigType
   pure $
-    TypeSig renamedSigName renamedSigType
+    TypeSig nodeID renamedSigName renamedSigType
 
 renameTopLevelSigWithoutRegistering :: Sig ParsedName -> Renamer (Sig Name)
-renameTopLevelSigWithoutRegistering (TypeSig sigName sigType) = do
+renameTopLevelSigWithoutRegistering (TypeSig nodeID sigName sigType) = do
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
   pure $
-    TypeSig renamedSigName renamedSigType
+    TypeSig nodeID renamedSigName renamedSigType
 
 renameSig :: Sig ParsedName -> Renamer (Sig Name)
-renameSig (TypeSig sigName sigType) = do
+renameSig (TypeSig nodeID sigName sigType) = do
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
-  addTopLevelSignature renamedSigName (unLoc renamedSigType)
+  addTopLevelSignature renamedSigName renamedSigType
   pure $
-    TypeSig renamedSigName renamedSigType
+    TypeSig nodeID renamedSigName renamedSigType
 
-renameSigType :: LPhType ParsedName -> Renamer (LPhType Name)
-renameSigType =
-  mapLocM
-    ( \case
-        PhVarTy parsedName -> PhVarTy <$> renameSigName parsedName
-        PhBuiltInTyCon tyCon -> pure $ PhBuiltInTyCon tyCon
-        PhAppTy parsedName1 parsedName2 ->
-          PhAppTy <$> renameSigType parsedName1 <*> renameSigType parsedName2
-        PhFunTy parsedName1 parsedName2 ->
-          PhFunTy <$> renameSigType parsedName1 <*> renameSigType parsedName2
-        PhListTy parsedName -> PhListTy <$> renameSigType parsedName
-        PhTupleTy parsedNames -> PhTupleTy <$> traverse renameSigType parsedNames
-        PhParTy parsedName -> PhParTy <$> renameSigType parsedName
-    )
+renameSigType :: PhType ParsedName -> Renamer (PhType Name)
+renameSigType = \case
+  PhVarTy nodeID parsedName -> PhVarTy nodeID <$> renameSigName parsedName
+  PhBuiltInTyCon nodeID tyCon -> pure $ PhBuiltInTyCon nodeID tyCon
+  PhAppTy nodeID parsedName1 parsedName2 ->
+    PhAppTy nodeID <$> renameSigType parsedName1 <*> renameSigType parsedName2
+  PhFunTy nodeID parsedName1 parsedName2 ->
+    PhFunTy nodeID <$> renameSigType parsedName1 <*> renameSigType parsedName2
+  PhListTy nodeID parsedName -> PhListTy nodeID <$> renameSigType parsedName
+  PhTupleTy nodeID parsedNames -> PhTupleTy nodeID <$> traverse renameSigType parsedNames
+  PhParTy nodeID parsedName -> PhParTy nodeID <$> renameSigType parsedName
 
 renameTopLevelBinding :: PhBind ParsedName -> Renamer (PhBind Name)
-renameTopLevelBinding (FunBind name matchGroup) = do
+renameTopLevelBinding (FunBind nodeID name matchGroup) = do
   renamedName <- renameTopLevelName name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
-    FunBind renamedName renamedMatchGroup
-renameTopLevelBinding (PatBind pat body) = do
-  renamedName <- traverse renameTopLevelPat pat
-  renamedBody <- traverse renameRHS body
-  pure $ PatBind renamedName renamedBody
+    FunBind nodeID renamedName renamedMatchGroup
+renameTopLevelBinding (PatBind nodeID pat body) = do
+  renamedName <- renameTopLevelPat pat
+  renamedBody <- renameRHS body
+  pure $ PatBind nodeID renamedName renamedBody
 
 renamePhBindWithoutRegisteringName :: PhBind ParsedName -> Renamer (PhBind Name)
-renamePhBindWithoutRegisteringName (FunBind name matchGroup) = do
+renamePhBindWithoutRegisteringName (FunBind nodeID name matchGroup) = do
   renamedName <- renameParsedNameWithoutRegistering name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
-    FunBind renamedName renamedMatchGroup
-renamePhBindWithoutRegisteringName (PatBind pat body) = do
-  renamedName <- traverse renamePatWithoutRegisteringName pat
-  renamedBody <- traverse renameRHS body
-  pure $ PatBind renamedName renamedBody
+    FunBind nodeID renamedName renamedMatchGroup
+renamePhBindWithoutRegisteringName (PatBind nodeID pat body) = do
+  renamedName <- renamePatWithoutRegisteringName pat
+  renamedBody <- renameRHS body
+  pure $ PatBind nodeID renamedName renamedBody
 
 guardNotFound :: ParsedName -> Renamer Name
 guardNotFound name = do

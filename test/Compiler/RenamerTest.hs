@@ -70,7 +70,7 @@ testRenamingUtils = do
           , uniq = Unique RenameSection 0
           }
   let topLevelSignatureType1 =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ = mkTcOccName noSrcSpan "Int"
@@ -96,7 +96,7 @@ testEnsureTopLevelBindingsHaveASignature = do
     
     foo = 3
   |]
-  parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  parsedSnippet1 <- assertRight =<< parse "<snippet1>" defaultSettings snippet1
   assertRenamerError (NoTopLevelSignature "foo") =<< rename parsedSnippet1
 
 testDuplicateBindingsAreCaught :: Assertion
@@ -111,12 +111,12 @@ testDuplicateBindingsAreCaught = do
           x = "mdr" 
        in 3
   |]
-  parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  parsedSnippet1 <- assertRight =<< parse "<snippet1>" defaultSettings snippet1
   assertRenamerError
     ( DuplicateBinding "x" $
         Vector.fromList
-          [ RealSrcSpan $ mkRealSrcSpan (mkRealSrcLoc "<snippet1>" 6 11) (mkRealSrcLoc "<snippet1>" 6 20)
-          , RealSrcSpan $ mkRealSrcSpan (mkRealSrcLoc "<snippet1>" 7 11) (mkRealSrcLoc "<snippet1>" 7 20)
+          [ 0
+          , 1
           ]
     )
     =<< rename parsedSnippet1
@@ -137,5 +137,5 @@ testBindingsWithSameNameInDifferentBranches = do
       let x = "blah"
        in x
   |]
-  parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  parsedSnippet1 <- assertRight =<< parse "<snippet1>" defaultSettings snippet1
   void $ assertRight =<< rename parsedSnippet1

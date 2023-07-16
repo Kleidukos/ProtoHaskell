@@ -25,7 +25,7 @@ addBinding name action = do
   env <- Reader.ask @RenamerContext
   TopLevelBindings{topLevelBindings} <- State.get
   if bindingMember name topLevelBindings || bindingMember name env.bindings
-    then Error.throwError $ DuplicateBinding name.occ.nameFS (Vector.singleton $ name.occ.occNameSrcSpan)
+    then Error.throwError $ DuplicateBinding name.occ.nameFS Vector.empty
     else Reader.local (const $ RenamerContext (Set.insert name env.bindings) env.signatures) action
 
 addBindings :: Vector Name -> Renamer a -> Renamer a
@@ -69,7 +69,7 @@ addTopLevelBinding name =
   State.modifyM
     ( \env -> do
         if bindingMember name env.topLevelBindings
-          then Error.throwError $ DuplicateBinding name.occ.nameFS (Vector.singleton name.occ.occNameSrcSpan)
+          then Error.throwError $ DuplicateBinding name.occ.nameFS Vector.empty
           else
             pure $
               TopLevelBindings

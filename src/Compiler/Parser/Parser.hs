@@ -3,10 +3,10 @@ where
 
 import Prelude hiding (lex)
 
-import Data.Bifunctor qualified as Bifunctor
 import Data.Text (Text)
 import Prettyprinter (Doc, pretty)
 
+import Compiler.BasicTypes.Location
 import Compiler.Parser.Errors
 import Compiler.Parser.Helpers
 import Compiler.Parser.Pattern qualified as Pattern
@@ -22,12 +22,13 @@ import Compiler.PhSyn.PhType
 -- Outputs either an error (already pretty printed) or a PhModule.
 
 -- TODO: fail with ErrMsg instead of 'Doc'
-parse :: SourceName -> Settings -> String -> Either (Doc ann) (PhModule ParsedName)
-parse srcname flags input = do
-  lexemes <- Bifunctor.first pretty $ lex srcname input
-  case runParser (moduleParser <* eof) srcname flags lexemes of
-    Right parsedModule -> Right parsedModule
-    Left parseErr -> Left $ prettyParseError parseErr input lexemes
+parse :: SourceName -> Settings -> String -> IO (Either (Doc ann) (PhModule ParsedName))
+parse srcname flags input = case lex srcname input of
+  Left err -> pure $ Left (pretty err)
+  Right lexemes ->
+    runParser (moduleParser <* eof) srcname flags lexemes >>= \case
+      Right v -> pure $ Right v
+      Left err -> pure $ Left $ prettyParseError err input lexemes
 
 -----------------------------------------------------------------------------------------
 -- Component Parsers
@@ -35,53 +36,56 @@ parse srcname flags input = do
 {-HLINT ignore "Use <$>" -}
 
 moduleParser :: Parser (PhModule ParsedName)
-moduleParser = Module <$> optionMaybe moduleHeader <*> parseTopDecls
+moduleParser = withNodeID $ \nodeID ->
+  Module nodeID
+    <$> optionMaybe moduleHeader
+    <*> parseTopDecls
 
-moduleHeader :: Parser (Located Text)
+moduleHeader :: Parser Text
 moduleHeader = do
   reserved "module"
   name <- modlName
   reserved "where"
-  return name
+  pure name
 
-parseTopDecls :: Parser [LPhDecl ParsedName]
+parseTopDecls :: Parser [PhDecl ParsedName]
 parseTopDecls = block parseTopDecl
 
-parseTopDecl :: Parser (LPhDecl ParsedName)
-parseTopDecl =
-  parseDataDecl
-    <|> parseSignature
-    <|> parseBinding
+parseTopDecl :: Parser (PhDecl ParsedName)
+parseTopDecl = withNodeID $ \nodeID ->
+  parseDataDecl nodeID
+    <|> parseSignature nodeID
+    <|> parseBinding nodeID
     -- <|> parseClassDecl
     -- <|> parseInstanceDecl
     <?> "top-level declaration"
 
-parseDataDecl :: Parser (LPhDecl ParsedName)
-parseDataDecl = locate $ do
+parseDataDecl :: NodeID -> Parser (PhDecl ParsedName)
+parseDataDecl nodeID = do
   reserved "data"
   typename <- tyconid
   typevars <- many tyvarid
   reservedOp "="
   condecls <- sepBy1 parseConDecl (reservedOp "|")
-  return $ DataDecl typename typevars condecls
+  pure $ DataDecl nodeID typename typevars condecls
 
 parseConDecl :: Parser (ConDecl ParsedName)
-parseConDecl = do
+parseConDecl = withNodeID $ \nodeID -> do
   name <- dataconid
-  fields <- map unLoc <$> many parseAType -- don't want to use parseType, it will just see
+  fields <- many parseAType -- don't want to use parseType, it will just see
   -- AppTy before many can turn it into a list
-  return $ ConDecl name fields
+  pure $ ConDecl nodeID name fields
 
-parseSignature :: Parser (LPhDecl ParsedName)
-parseSignature =
-  locate . fmap Signature $
+parseSignature :: NodeID -> Parser (PhDecl ParsedName)
+parseSignature nodeID =
+  fmap (Signature nodeID) $
     try parseTypeSignature
 
 parseTypeSignature :: Parser (Sig ParsedName)
-parseTypeSignature = do
+parseTypeSignature = withNodeID $ \nodeID -> do
   name <- varid
   reservedOp "::"
-  TypeSig name <$> parseContextType
+  TypeSig nodeID name <$> parseContextType
 
 -- parseFixitySignature :: Parser (Sig ParsedName)
 -- parseFixitySignature =
@@ -96,21 +100,22 @@ parseTypeSignature = do
 --     <|> (reserved "infixl" $> InfixL)
 --     <|> (reserved "infixr" $> InfixR)
 
-parseBinding :: Parser (LPhDecl ParsedName)
-parseBinding = locate . fmap Binding $ parseBind
+parseBinding :: NodeID -> Parser (PhDecl ParsedName)
+parseBinding nodeID = fmap (Binding nodeID) parseBind
 
 parseBind :: Parser (PhBind ParsedName)
 parseBind = try parseFunBinding <|> parsePatternBinding
 
 -- TODO: parse bindings for operators
 parseFunBinding :: Parser (PhBind ParsedName)
-parseFunBinding = do
+parseFunBinding = withNodeID $ \nodeID -> do
   funName <- varid
-  match <- locate $ parseMatch FunCtxt
-  return $ FunBind funName $ MG{alternatives = [match], context = FunCtxt}
+  match <- parseMatch FunCtxt
+  pure $ FunBind nodeID funName $ MG{nodeID, alternatives = [match], context = FunCtxt}
 
 parsePatternBinding :: Parser (PhBind ParsedName)
-parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
+parsePatternBinding = withNodeID $ \nodeID ->
+  PatBind nodeID <$> Pattern.parse <*> parseRHS LetCtxt
 
 -- parsePatternBinding :: Parser (PhBind ParsedName)
 -- parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
@@ -118,23 +123,23 @@ parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetC
 -- emptyLocalBinds :: PhLocalBinds ParsedName
 -- emptyLocalBinds = LocalBinds [] []
 
--- parseClassDecl :: Parser (LPhDecl ParsedName)
--- parseClassDecl = locate $ do
+-- parseClassDecl :: Parser (PhDecl ParsedName)
+-- parseClassDecl =  do
 --   reserved "class"
---   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> return []
+--   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> pure []
 --   ClassDecl ctx
 --     <$> tyclsid -- renamer has to check that this is unqualified
 --     <*> tyvarid
---     <*> ((reserved "where" *> parseLocalBinds) <|> locate (return emptyLocalBinds))
+--     <*> ((reserved "where" *> parseLocalBinds) <|> locate (pure emptyLocalBinds))
 
--- parseInstanceDecl :: Parser (LPhDecl ParsedName)
--- parseInstanceDecl = locate $ do
+-- parseInstanceDecl :: Parser (PhDecl ParsedName)
+-- parseInstanceDecl =  do
 --   reserved "instance"
---   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> return []
+--   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> pure []
 --   InstDecl ctx
 --     <$> tyclsid
 --     <*> parseType
---     <*> ((reserved "where" *> parseLocalBinds) <|> locate (return emptyLocalBinds))
+--     <*> ((reserved "where" *> parseLocalBinds) <|> locate (pure emptyLocalBinds))
 
 -- | Parses a single match which will eventually be part of a match group.
 --
@@ -144,25 +149,25 @@ parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetC
 --
 -- See also: 'parseRHS'
 parseMatch :: MatchContext -> Parser (Match ParsedName)
-parseMatch ctx = do
-  pats <- many1 Pattern.parseLocated
-  rhs <- locate $ parseRHS ctx
-  return Match{matchPats = pats, rhs}
+parseMatch ctx = withNodeID $ \nodeID -> do
+  pats <- many1 Pattern.parse
+  rhs <- parseRHS ctx
+  pure $ Match nodeID pats rhs
 
 -- | Parses the right hand side of a binding.
 -- Lam contexts are not allowed to contain local bindings. Case contexts /are/, though
 -- hardly anyone ever uses that feature.
 parseRHS :: MatchContext -> Parser (RHS ParsedName)
-parseRHS ctx = do
+parseRHS ctx = withNodeID $ \nodeID -> do
   expr <- parseGRHS ctx
   mLocalBinds <-
     if ctx /= LamCtxt
       then optionMaybe (token TokWhere >> parseLocalBinds) <?> "where clause"
-      else return Nothing
-  return RHS{expr, localBinds = flatten mLocalBinds}
+      else pure Nothing
+  pure RHS{nodeID, expr, localBinds = flatten nodeID mLocalBinds}
   where
-    flatten (Just binds) = binds
-    flatten Nothing = Located noSrcSpan $ LocalBinds [] []
+    flatten _nodeID (Just binds) = binds
+    flatten nodeID Nothing = LocalBinds nodeID [] []
 
 -- | Parses the "guarded right hand sides" of a binding. See NOTE: [GRHS] in PhExpr.
 --
@@ -170,7 +175,7 @@ parseRHS ctx = do
 -- but by '=' in Fun and Let contexts
 --
 -- Lam contexts are not allowed to contain guards.
-parseGRHS :: MatchContext -> Parser (LPhExpr ParsedName)
+parseGRHS :: MatchContext -> Parser (PhExpr ParsedName)
 parseGRHS LamCtxt = do
   matchCtx2Parser LamCtxt
   parseLocExpr
@@ -178,32 +183,33 @@ parseGRHS ctxt = parseUnguarded
   where
     parseUnguarded = matchCtx2Parser ctxt >> parseLocExpr
 
-type LocalDecls = ([LPhBind ParsedName], [LSig ParsedName])
-parseLocalBinds :: Parser (LPhLocalBinds ParsedName)
-parseLocalBinds = locate $ do
+type LocalDecls = ([PhBind ParsedName], [Sig ParsedName])
+
+parseLocalBinds :: Parser (PhLocalBinds ParsedName)
+parseLocalBinds = withNodeID $ \nodeID -> do
   decls <- block parseLocalDecl
-  let (binds, sigs) = separate decls
-  return $ LocalBinds binds sigs
+  (binds, sigs) <- pure $ separate decls
+  pure $ LocalBinds nodeID binds sigs
   where
     -- The use of foldr is absolutely critical, as the order of the bindings matters.
     -- Folding from the right and prepending with (:) will maintain the order.
     -- The renamer should check the order *anyway* if the compiler is in debug mode.
-    separate :: [LPhDecl ParsedName] -> LocalDecls
-    separate = foldr move ([], [])
+    separate :: [PhDecl ParsedName] -> LocalDecls
+    separate decls = foldr move ([], []) decls
 
     -- \| Takes the pair of signatures and bindings already parsed
-    --   and parses a new one, placing it appropriately
-    move :: LPhDecl ParsedName -> LocalDecls -> LocalDecls
-    move (Located s new) (binds, sigs) = case new of
-      Binding bind -> (Located s bind : binds, sigs)
-      Signature sig -> (binds, Located s sig : sigs)
+    --  and parses a new one, placing it appropriately
+    move :: PhDecl ParsedName -> LocalDecls -> LocalDecls
+    move new (binds, sigs) = case new of
+      Binding _nodeID' bind -> (bind : binds, sigs)
+      Signature _nodeID' sig -> (binds, sig : sigs)
 
-parseLocalDecl :: Parser (LPhDecl ParsedName)
-parseLocalDecl =
-  parseSignature
+parseLocalDecl :: Parser (PhDecl ParsedName)
+parseLocalDecl = withNodeID $ \nodeID ->
+  parseSignature nodeID
     -- We'll delay rejecting pattern bindings in class
     -- or instance declarations for the renamer.
-    <|> parseBinding
+    <|> parseBinding nodeID
     <?> "local declaration"
 
 matchCtx2Parser :: MatchContext -> Parser ()
@@ -225,40 +231,42 @@ matchCtx2Parser =
 -----------------------------------------------------------------------------------------
 
 parseExpr :: Parser (PhExpr ParsedName)
-parseExpr =
+parseExpr = withNodeID $ \nodeID ->
   do
-    expression <- locate parseInfixExp
+    expression <- parseInfixExp
     mCType <- optionMaybe $ reservedOp "::" >> parseContextType
-    return $ case mCType of
-      Nothing -> unLoc expression
-      Just ty -> Typed ty expression
+    pure $ case mCType of
+      Nothing -> expression
+      Just ty -> Typed nodeID ty expression
     <?> "expression"
 
-parseLocExpr :: Parser (LPhExpr ParsedName)
-parseLocExpr = locate parseExpr
+parseLocExpr :: Parser (PhExpr ParsedName)
+parseLocExpr = parseExpr
 
 -- | Parses operator (infix) expressions.
 -- We parse all operators as left associative and highest
 -- precedence, then rebalance the tree later.
 parseInfixExp :: Parser (PhExpr ParsedName)
-parseInfixExp =
-  parseSyntacticNegation
-    <|> unLoc
-      <$> locate parseBExp
-        `chainl1` parseQopFunc
-  where
-    parseQopFunc = mkOpApp <$> parseQop
-    mkOpApp op x@(Located left _) y@(Located right _) =
-      Located (combineSrcSpans left right) (OpApp x op y)
+parseInfixExp = withNodeID $ \nodeID ->
+  parseSyntacticNegation nodeID
+    <|> parseBExp `chainl1` (mkOpApp nodeID <$> parseQop)
 
-parseQop :: Parser (LPhExpr ParsedName)
-parseQop = locate (PhVar <$> (varsym <|> backticks varid) <?> "operator")
+mkOpApp
+  :: NodeID
+  -> PhExpr ParsedName
+  -> PhExpr ParsedName
+  -> PhExpr ParsedName
+  -> PhExpr ParsedName
+mkOpApp nodeID op left = OpApp nodeID left op
 
-parseSyntacticNegation :: Parser (PhExpr ParsedName)
-parseSyntacticNegation = do
+parseQop :: Parser (PhExpr ParsedName)
+parseQop = withNodeID $ \nodeID ->
+  PhVar nodeID <$> (varsym <|> backticks varid) <?> "operator"
+
+parseSyntacticNegation :: NodeID -> Parser (PhExpr ParsedName)
+parseSyntacticNegation nodeID = do
   satisfy isDashSym
-  e <- locate parseInfixExp
-  return $ NegApp e
+  NegApp nodeID <$> parseInfixExp
   where
     isDashSym :: Token -> Bool
     isDashSym (TokVarSym "-") = True
@@ -274,21 +282,23 @@ parseBExp =
     <|> parseFExp
 
 parseLamExp :: Parser (PhExpr ParsedName)
-parseLamExp = do
+parseLamExp = withNodeID $ \nodeID1 -> do
   reservedOp "\\"
-  match <- locate $ parseMatch LamCtxt -- parseMatch parses RHS
-  return $ PhLam $ MG [match] LamCtxt
+  match <- parseMatch LamCtxt -- parseMatch parses RHS
+  withNodeID $ \nodeID2 ->
+    pure $
+      PhLam nodeID1 $
+        MG nodeID2 [match] LamCtxt
 
 parseLetExp :: Parser (PhExpr ParsedName)
-parseLetExp = do
+parseLetExp = withNodeID $ \nodeID -> do
   reserved "let"
   decls <- parseLocalBinds
   reserved "in"
-  body <- parseLocExpr
-  return $ PhLet decls body
+  PhLet nodeID decls <$> parseLocExpr
 
 parseIfExp :: Parser (PhExpr ParsedName)
-parseIfExp = do
+parseIfExp = withNodeID $ \nodeID -> do
   reserved "if"
   c <- parseLocExpr
   optSemi
@@ -296,180 +306,175 @@ parseIfExp = do
   t <- parseLocExpr
   optSemi
   maybeAlign >> reserved "else"
-  f <- parseLocExpr
-  return $ PhIf c t f
+  PhIf nodeID c t <$> parseLocExpr
 
 parseCaseExp :: Parser (PhExpr ParsedName)
-parseCaseExp = do
+parseCaseExp = withNodeID $ \nodeID -> do
   reserved "case"
   scrut <- parseLocExpr
   reserved "of"
-  matchGroup <- parseCaseAlts
-  return $ PhCase scrut matchGroup
+  PhCase nodeID scrut <$> parseCaseAlts
 
 parseDoExp :: Parser (PhExpr ParsedName)
-parseDoExp = do
+parseDoExp = withNodeID $ \nodeID -> do
   reserved "do"
-  PhDo <$> parseDoStmts
+  PhDo nodeID <$> parseDoStmts
 
 parseFExp :: Parser (PhExpr ParsedName)
-parseFExp = unLoc <$> parseAExp `chainl1` return mkLPhAppExpr
+parseFExp = withNodeID parseAExp
 
-parseAExp :: Parser (LPhExpr ParsedName)
-parseAExp =
-  locate
-    ( PhVar <$> var
-        <|> parseGCon
-        <|> parseLiteral
-        <|> parens parseExprParen
-        <|> brackets parseExprBracket
-        <?> "term"
-    )
+parseAExp :: NodeID -> Parser (PhExpr ParsedName)
+parseAExp nodeID =
+  PhVar nodeID <$> var
+    <|> parseGCon nodeID
+    <|> parseLiteral nodeID
+    <|> parens parseExprParen
+    <|> brackets parseExprBracket
+    <?> "term"
 
-parseGCon :: Parser (PhExpr ParsedName)
-parseGCon = PhVar <$> dataconid
+parseGCon :: NodeID -> Parser (PhExpr ParsedName)
+parseGCon nodeID = PhVar nodeID <$> dataconid
 
-parseLiteral :: Parser (PhExpr ParsedName)
-parseLiteral =
-  (PhLit <$>) $
+parseLiteral :: NodeID -> Parser (PhExpr ParsedName)
+parseLiteral nodeID =
+  (PhLit nodeID <$>) $
     LitInt <$> integer
       <|> LitFloat <$> float
       <|> LitChar <$> charLiteral
       <|> LitString <$> stringLiteral
 
 parseExprParen :: Parser (PhExpr ParsedName)
-parseExprParen = do
+parseExprParen = withNodeID $ \nodeID -> do
   exps <- commaSep1 parseLocExpr
-  return $ case exps of
+  pure $ case exps of
     -- () is a GCon
-    [expression] -> PhPar expression
-    expressions -> ExplicitTuple expressions
+    [expression] -> PhPar nodeID expression
+    expressions -> ExplicitTuple nodeID expressions
 
 parseExprBracket :: Parser (PhExpr ParsedName)
-parseExprBracket = do
-  exps <- commaSep1 $ locate parseExpr
+parseExprBracket = withNodeID $ \nodeID -> do
+  exps <- commaSep1 parseExpr
   case exps of
-    [expression] -> parseDotsSeq expression <|> return (ExplicitList [expression])
-    [e1, e2] -> parseCommaSeq e1 e2 <|> return (ExplicitList [e1, e2])
-    _ -> return $ ExplicitList exps
+    [expression] -> parseDotsSeq expression <|> pure (ExplicitList nodeID [expression])
+    [e1, e2] -> parseCommaSeq e1 e2 <|> pure (ExplicitList nodeID [e1, e2])
+    _ -> pure $ ExplicitList nodeID exps
 
 -- | Given the first two elements of an arithmetic sequence [e1, e2 ..] or [e1, e2 .. e3]
 -- parse the rest.
-parseCommaSeq :: LPhExpr ParsedName -> LPhExpr ParsedName -> Parser (PhExpr ParsedName)
-parseCommaSeq e1 e2 =
-  ArithSeq <$> do
+parseCommaSeq :: PhExpr ParsedName -> PhExpr ParsedName -> Parser (PhExpr ParsedName)
+parseCommaSeq e1 e2 = withNodeID $ \nodeID ->
+  ArithSeq nodeID <$> do
     reservedOp ".."
     e3 <- optionMaybe parseLocExpr
-    return $ case e3 of
-      Nothing -> FromThen e1 e2
-      Just e -> FromThenTo e1 e2 e
+    withNodeID $ \nodeID2 -> do
+      case e3 of
+        Nothing -> pure $ FromThen nodeID2 e1 e2
+        Just e -> pure $ FromThenTo nodeID2 e1 e2 e
 
-parseDotsSeq :: LPhExpr ParsedName -> Parser (PhExpr ParsedName)
-parseDotsSeq expression =
-  ArithSeq <$> do
+parseDotsSeq :: PhExpr ParsedName -> Parser (PhExpr ParsedName)
+parseDotsSeq expression = withNodeID $ \nodeID ->
+  ArithSeq nodeID <$> do
     reservedOp ".."
     e2 <- optionMaybe parseLocExpr
-    return $ case e2 of
-      Nothing -> From expression
-      Just e -> FromTo expression e
+    withNodeID $ \nodeID2 -> do
+      case e2 of
+        Nothing -> pure $ From nodeID2 expression
+        Just e -> pure $ FromTo nodeID2 expression e
 
-parseDoStmts :: Parser [LStmt ParsedName]
+parseDoStmts :: Parser [Stmt ParsedName]
 parseDoStmts = block1 parseDoStmt
 
-parseDoStmt :: Parser (LStmt ParsedName)
+parseDoStmt :: Parser (Stmt ParsedName)
 parseDoStmt =
-  locate
-    ( -- ( try
-      --     ( do
-      --         pat <- Pattern.parseLocated
-      --         reservedOp "<-"
-      --         e <- parseLocExpr
-      --         return $ SGenerator pat e
-      --     )
-      try (reserved "let" *> (SLet <$> parseLocalBinds))
-        <|> SExpr <$> parseLocExpr
-        <?> "statement of a do block"
-    )
+  -- ( try
+  --     ( do
+  --         pat <- Pattern.parseLocated
+  --         reservedOp "<-"
+  --         e <- parseLocExpr
+  --         pure $ SGenerator pat e
+  --     )
+  try (reserved "let" *> (SLet <$> parseLocalBinds))
+    <|> SExpr <$> parseLocExpr
+    <?> "statement of a do block"
 
 parseCaseAlts :: Parser (MatchGroup ParsedName)
-parseCaseAlts = MG <$> (block1 . locate $ parseMatch CaseCtxt) <*> pure CaseCtxt
+parseCaseAlts = withNodeID $ \nodeID -> MG nodeID <$> block1 (parseMatch CaseCtxt) <*> pure CaseCtxt
 
 -----------------------------------------------------------------------------------------
 -- Parsing Types
 -----------------------------------------------------------------------------------------
 
 -- | Parses a type with context, like Eq a => a -> a -> Bool
-parseContextType :: Parser (LPhType ParsedName)
-parseContextType = locate $ do
-  -- mctx <- optionMaybe $ try $ parseContext <* reservedOp "=>"
-  ty <- parseType
-  pure $ unLoc ty
+parseContextType :: Parser (PhType ParsedName)
+parseContextType = parseType
 
--- return $ case mctx of
+-- mctx <- optionMaybe $ try $ parseContext <* reservedOp "=>"
+-- unLoc <$> parseType
+
+-- pure $ case mctx of
 --   Nothing -> unLoc ty
 --   Just preds -> PhQualTy preds ty
 
--- | Parses a context, but NOT the predicate arrow, =>
-parseContext :: Parser [Pred ParsedName]
-parseContext =
-  pure <$> parsePred <|> parens (commaSep parsePred)
+-- -- | Parses a context, but NOT the predicate arrow, =>
+-- parseContext :: Parser [Pred ParsedName]
+-- parseContext =
+--   pure <$> parsePred <|> parens (commaSep parsePred)
 
--- | Parses an individual predicate, like Eq a
-parsePred :: Parser (Pred ParsedName)
-parsePred =
-  try parseSimplePred
-    <|> do
-      cls <- tyclsid
-      ty <- parens $ do
-        tyvar <- locate $ PhVarTy <$> tyvarid
-        args <- many1 parseAType
-        return $ foldl1 mkLPhAppTy (tyvar : args)
-      return $ IsIn cls (unLoc ty)
+-- -- | Parses an individual predicate, like Eq a
+-- parsePred :: Parser (Pred ParsedName)
+-- parsePred =
+--   try parseSimplePred
+--     <|> do
+--       cls <- tyclsid
+--       ty <- parens $ do
+--         tyvar <-  PhVarTy <$> tyvarid
+--         args <- many1 parseAType
+--         pure $ foldl1 mkPhAppTy (tyvar : args)
+--       pure $ IsIn cls (unLoc ty)
 
 -- | Parses a simple context, like those legal in an instance head.
 -- Unlike 'parseContext', rejects types like 'Eq (m a)'
-parseSimpleContext :: Parser [Pred ParsedName]
-parseSimpleContext =
-  pure <$> parseSimplePred <|> parens (commaSep parseSimplePred)
+-- parseSimpleContext :: Parser [Pred ParsedName]
+-- parseSimpleContext =
+--   pure <$> parseSimplePred <|> parens (commaSep parseSimplePred)
 
--- | Parses a simple predicate, like 'Eq a'
-parseSimplePred :: Parser (Pred ParsedName)
-parseSimplePred = IsIn <$> tyclsid <*> (PhVarTy <$> tyvarid)
+-- -- | Parses a simple predicate, like 'Eq a'
+-- parseSimplePred :: Parser (Pred ParsedName)
+-- parseSimplePred = IsIn <$> tyclsid <*> (PhVarTy <$> tyvarid)
 
-parseType :: Parser (LPhType ParsedName)
-parseType = do
+parseType :: Parser (PhType ParsedName)
+parseType = withNodeID $ \nodeID -> do
   btype <- parseBType
   funtypes <- many (reservedOp "->" >> parseType)
-  return $ foldl mkLPhFunTy btype funtypes
+  pure $ foldl (PhFunTy nodeID) btype funtypes
 
-parseBType :: Parser (LPhType ParsedName)
-parseBType = do
+parseBType :: Parser (PhType ParsedName)
+parseBType = withNodeID $ \nodeID -> do
   atypes <- many1 parseAType
-  return $ foldl1 mkLPhAppTy atypes
+  pure $ foldl1 (PhAppTy nodeID) atypes
 
-parseAType :: Parser (LPhType ParsedName)
-parseAType =
-  locate $
-    PhVarTy <$> tyvarid
-      <|> try parseGTyCon
-      <|> do
-        types <- parens $ commaSep1 parseType
-        case types of
-          -- () is a GTyCon
-          [t] -> return $ PhParTy t
-          ts -> return $ PhTupleTy ts
-      <|> PhListTy <$> brackets parseType
+parseAType :: Parser (PhType ParsedName)
+parseAType = withNodeID $ \nodeID ->
+  PhVarTy nodeID <$> tyvarid
+    <|> try parseGTyCon
+    <|> do
+      types <- parens $ commaSep1 parseType
+      case types of
+        -- () is a GTyCon
+        [t] -> pure $ PhParTy nodeID t
+        ts -> pure $ PhTupleTy nodeID ts
+    <|> PhListTy nodeID <$> brackets parseType
 
 parseGTyCon :: Parser (PhType ParsedName)
-parseGTyCon =
-  PhVarTy <$> tyconid
-    <|> (brackets (return ()) $> PhBuiltInTyCon ListTyCon)
-    <|> try (parens (reservedOp "->") $> PhBuiltInTyCon FunTyCon)
+parseGTyCon = withNodeID $ \nodeID ->
+  PhVarTy nodeID <$> tyconid
+    <|> brackets (pure ()) $> PhBuiltInTyCon nodeID ListTyCon
+    <|> try (parens (reservedOp "->") $> PhBuiltInTyCon nodeID FunTyCon)
     <|> do
       len <- length <$> parens (many comma)
-      return $ case len of
-        0 -> PhBuiltInTyCon UnitTyCon
-        _ -> PhBuiltInTyCon (TupleTyCon $ len + 1)
+      pure $ case len of
+        0 -> PhBuiltInTyCon nodeID UnitTyCon
+        _ -> PhBuiltInTyCon nodeID (TupleTyCon $ len + 1)
 
 -- TODO
 -- Once we have built-in representations for these types,

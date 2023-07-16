@@ -37,8 +37,7 @@ mkUniqueSupply section = do
 nextUnique :: (Reader UniqueSupply :> es, IOE :> es) => Eff es Unique
 nextUnique = do
   (UniqueSupply section counter) <- Reader.ask
-  newUniqueInt <- liftIO $ Counter.get counter
-  liftIO $ Counter.set counter (newUniqueInt + 1)
+  newUniqueInt <- liftIO $ Counter.add counter 1
   pure $ Unique section newUniqueInt
 
 instance Pretty UniqueSection where

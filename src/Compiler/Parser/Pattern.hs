@@ -1,33 +1,31 @@
-module Compiler.Parser.Pattern (parse, parseLocated) where
+module Compiler.Parser.Pattern (parse) where
 
+import Compiler.BasicTypes.Location
 import Compiler.Parser.Helpers
 import Compiler.PhSyn.PhExpr
 
-parseLocated :: Parser (LPat ParsedName)
-parseLocated = locate parse
-
 parse :: Parser (Pat ParsedName)
-parse =
-  parseVar
-    <|> parseWithinParentheses
-    <|> literalPattern
-    <|> token TokUnderscore $> PWildCard
-    <|> (PCon <$> dataconid <*> many parse)
+parse = withNodeID $ \nodeID ->
+  parseVar nodeID
+    <|> parseWithinParentheses nodeID
+    <|> literalPattern nodeID
+    <|> token TokUnderscore $> PWildCard nodeID
+    <|> (PCon nodeID <$> dataconid <*> many parse)
     <?> "pattern"
 
-parseVar :: Parser (Pat ParsedName)
-parseVar = PVar <$> varid
+parseVar :: NodeID -> Parser (Pat ParsedName)
+parseVar nodeID = PVar nodeID <$> varid
 
-parseWithinParentheses :: Parser (Pat ParsedName)
-parseWithinParentheses = do
+parseWithinParentheses :: NodeID -> Parser (Pat ParsedName)
+parseWithinParentheses nodeID = do
   inside <- parens $ many parse
   pure $ case inside of
-    [pat] -> ParPat pat
-    pats -> PTuple pats
+    [pat] -> ParPat nodeID pat
+    pats -> PTuple nodeID pats
 
-literalPattern :: Parser (Pat ParsedName)
-literalPattern =
-  (PLit <$>) $
+literalPattern :: NodeID -> Parser (Pat ParsedName)
+literalPattern nodeID =
+  (PLit nodeID <$>) $
     LitInt <$> integer
       <|> LitFloat <$> float
       <|> LitChar <$> charLiteral

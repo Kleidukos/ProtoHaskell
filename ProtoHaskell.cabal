@@ -24,7 +24,7 @@ common ghc-options
     -fhide-source-paths -Wno-unused-do-bind -fshow-hole-constraints
     -Wno-unticked-promoted-constructors -Werror=unused-imports
     -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16
-    -Wunused-packages
+    -Wunused-packages -Werror=missing-fields
 
   default-language:   GHC2021
   default-extensions:
@@ -32,6 +32,7 @@ common ghc-options
     BangPatterns
     DataKinds
     DerivingStrategies
+    DuplicateRecordFields
     FlexibleInstances
     FunctionalDependencies
     GeneralizedNewtypeDeriving

@@ -33,9 +33,9 @@ spec =
 
 testTypeSynthesisOnStringLiteral :: Assertion
 testTypeSynthesisOnStringLiteral = do
-  let stringLiteral = PhLit (LitString "Parser Golden Tests")
+  let stringLiteral = PhLit 0 (LitString "Parser Golden Tests")
   let expectedType =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ =
@@ -58,9 +58,9 @@ testTypeSynthesisOnStringLiteral = do
 
 testTypeSynthesisOnCharLiteral :: Assertion
 testTypeSynthesisOnCharLiteral = do
-  let stringLiteral = PhLit (LitChar 'c')
+  let stringLiteral = PhLit 0 (LitChar 'c')
   let expectedType =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ =
@@ -83,9 +83,9 @@ testTypeSynthesisOnCharLiteral = do
 
 testTypeSynthesisOnIntLiteral :: Assertion
 testTypeSynthesisOnIntLiteral = do
-  let stringLiteral = PhLit (LitInt 3)
+  let stringLiteral = PhLit 0 (LitInt 3)
   let expectedType =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ =
@@ -108,9 +108,9 @@ testTypeSynthesisOnIntLiteral = do
 
 testTypeSynthesisOnFloatLiteral :: Assertion
 testTypeSynthesisOnFloatLiteral = do
-  let stringLiteral = PhLit (LitFloat 3.2)
+  let stringLiteral = PhLit 0 (LitFloat 3.2)
   let expectedType =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ =
@@ -144,10 +144,10 @@ testLookupVar = do
                 }
           , uniq = Unique TypeCheckSection 0
           }
-  let var = PhVar varName
+  let var = PhVar 0 varName
 
   let expectedType =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ =
@@ -184,7 +184,7 @@ testAnnotatedExpr = do
           }
 
   let expectedType =
-        PhVarTy $
+        PhVarTy 0 $
           Name
             { sort = Internal
             , occ =
@@ -196,7 +196,7 @@ testAnnotatedExpr = do
             , uniq = Unique TypeCheckSection 1
             }
 
-  let var = Typed (Located noSrcSpan expectedType) (Located noSrcSpan (PhVar varName))
+  let var = Typed 0 expectedType (PhVar 2 varName)
 
   let environment = Environment $ Map.singleton varName expectedType
   result <-

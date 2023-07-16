@@ -12,26 +12,17 @@ module Compiler.Parser.Helpers
 
 import Prelude hiding (lex)
 
-import Compiler.Settings
-
-import Compiler.Parser.Errors
-import Compiler.Parser.Lexer
-
-import Compiler.BasicTypes.FastString (unpackFS)
-import Compiler.BasicTypes.OccName
-import Compiler.BasicTypes.ParsedName
-import Compiler.BasicTypes.SrcLoc
-
-import Data.Maybe (isJust)
-import Data.Text (Text)
-import Data.Text qualified as T
-
 import Control.Arrow ((>>>))
 import Control.Monad
 import Control.Monad.Identity
 import Data.Functor (($>))
+import Data.Maybe (isJust)
+import Data.Text (Text)
+import Data.Text qualified as T
 import Prettyprinter (Doc, Pretty (..))
 
+import Control.Concurrent.Counter (Counter)
+import Control.Concurrent.Counter qualified as Counter
 import Text.Parsec hiding
   ( anyToken
   , label
@@ -44,16 +35,26 @@ import Text.Parsec hiding
   , (<?>)
   )
 import Text.Parsec qualified as Parsec
+import Text.Parsec.Language (GenLanguageDef)
 import Text.Parsec.Pos (newPos)
-
-import Text.Parsec.Language (GenLanguageDef (..))
 import Text.Parsec.Token (GenTokenParser)
 import Text.Parsec.Token qualified as PT
 
+import Compiler.BasicTypes.FastString (unpackFS)
+import Compiler.BasicTypes.Location
+import Compiler.BasicTypes.OccName
+import Compiler.BasicTypes.ParsedName
+import Compiler.BasicTypes.SrcLoc
+import Compiler.Parser.Errors
+import Compiler.Parser.Lexer
+import Compiler.Settings
+import System.IO.Unsafe (unsafePerformIO)
+
 type Parser a =
-  Parsec
+  ParsecT
     [Lexeme] -- Token stream
     ParseState
+    IO
     a
 
 data ParseState = ParseState
@@ -61,8 +62,27 @@ data ParseState = ParseState
   , indentOrd :: IndentOrdering
   , layoutContexts :: [LayoutContext]
   , endOfPrevToken :: SrcLoc
+  , nodeIDSupply :: Counter
+  , locationMap :: LocationMap
   }
-  deriving (Show)
+
+getFreshNodeID :: Parser NodeID
+getFreshNodeID = do
+  counter <- gets nodeIDSupply
+  pure $ unsafePerformIO $ Counter.add counter 1
+
+withNodeID :: (NodeID -> Parser a) -> Parser a
+withNodeID p = do
+  nodeID <- getFreshNodeID
+  startPos <- getPosition
+  let srcName = sourceName startPos
+      startLine = sourceLine startPos
+      startCol = sourceColumn startPos
+      startLoc = mkSrcLoc srcName startLine startCol
+  res <- p nodeID
+  endPos <- gets endOfPrevToken
+  modify $ \state -> state{locationMap = insertLocation nodeID (mkSrcSpan startLoc endPos) state.locationMap}
+  pure res
 
 data IndentOrdering = Eq | Gt | Geq deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
@@ -71,7 +91,10 @@ data LayoutContext
   | Implicit Int
   deriving (Eq, Ord, Show)
 
-initParseState flags = ParseState flags Eq [] noSrcLoc
+initParseState :: Settings -> FilePath -> IO ParseState
+initParseState flags path = do
+  nodeIDSupply <- Counter.new 0
+  pure $ ParseState flags Eq [] noSrcLoc nodeIDSupply (LocationMap path mempty)
 
 pushLayoutContext :: LayoutContext -> Parser ()
 pushLayoutContext ctx = modifyState $ \s@ParseState{layoutContexts} ->
@@ -99,26 +122,26 @@ modify = modifyState
 currentLayoutContext :: Parser (Maybe LayoutContext)
 currentLayoutContext = do
   ctxs <- gets layoutContexts
-  return $ case ctxs of
+  pure $ case ctxs of
     [] -> Nothing
     (x : _) -> Just x
 
 label :: Parser a -> String -> Parser a
-label p exp = do
+label p expression = do
   mctx <- currentLayoutContext
   case mctx of
-    Nothing -> Parsec.label p exp
-    Just Explicit -> Parsec.label p exp
-    Just (Implicit n) -> labelWithIndentInfo p exp n
+    Nothing -> Parsec.label p expression
+    Just Explicit -> Parsec.label p expression
+    Just (Implicit n) -> labelWithIndentInfo p expression n
   where
-    labelWithIndentInfo p exp n = do
+    labelWithIndentInfo p expression' n = do
       ord <- gets indentOrd
       let ordPiece = case ord of
             Eq -> show n
             Gt -> "greater than " ++ show n
             Geq -> "less than" ++ show n -- Shouldn't happen
           indentPiece = "at indentation"
-      Parsec.label p $ unwords [exp, indentPiece, ordPiece]
+      Parsec.label p $ unwords [expression', indentPiece, ordPiece]
 
 (<?>) = label
 infixl 0 <?> -- I disagree with this fixity but it's what Parsec uses
@@ -146,9 +169,9 @@ To remedy this, we have to overlap the existing (informative) show instance for 
 in order to be able to guarantee that the user sees pretty-printed error messages.
 
 -}
-instance {-# OVERLAPPING #-} Show (GenLocated SrcSpan Token) where
-  show (Located _ TokIndent) = "indentation"
-  show (Located _ t) = showTokenPretty t
+-- instance {-# OVERLAPPING #-} Show (GenLocated SrcSpan Token) where
+--   show (Located _ TokIndent) = "indentation"
+--   show (Located _ t) = showTokenPretty t
 
 -----------------------------------------------------------------------------------------
 -- Primitive parsers for our Tokens
@@ -170,7 +193,7 @@ satisfyNoIndentGuard p = do
       posFromTok
       testTok
   modifyState $ \s -> s{endOfPrevToken = srcSpanEnd pos}
-  return lexeme
+  pure lexeme
   where
     testTok t = if (p . unLoc) t then Just t else Nothing
 
@@ -196,8 +219,8 @@ guardIndentation = do
   when (isJust check || ord == Eq) $ do
     mr <- currentLayoutContext
     case mr of
-      Nothing -> return ()
-      Just Explicit -> return ()
+      Nothing -> pure ()
+      Just Explicit -> pure ()
       Just (Implicit r) -> do
         c <- sourceColumn <$> getPosition
         let compare = case ord of
@@ -295,7 +318,7 @@ block p = explicitBlock <|> implicitBlock
         $ stmtSep p
     implicitBlock =
       between openImplicit closeImplicit $
-        concat <$> many (align >> stmtSep1 p) <|> return []
+        concat <$> many (align >> stmtSep1 p) <|> pure []
 
 -- | The same as 'block', but requires at least one instance of 'p'.
 block1 :: Parser a -> Parser [a]
@@ -319,44 +342,33 @@ openImplicit = do
 -- | Closes an implicit block. Always succeeds and modifies the LayoutContexts.
 closeImplicit = popLayoutContext
 
-locate :: Parser a -> Parser (Located a)
-locate p = do
-  startPos <- getPosition
-  let srcName = sourceName startPos
-      startLine = sourceLine startPos
-      startCol = sourceColumn startPos
-      startLoc = mkSrcLoc srcName startLine startCol
-  res <- p
-  endPos <- gets endOfPrevToken
-  return $ Located (mkSrcSpan startLoc endPos) res
-
 -----------------------------------------------------------------------------------------
 -- Running Parsers
 -----------------------------------------------------------------------------------------
 
-runParser :: Parser a -> SourceName -> Settings -> [Lexeme] -> Either ParseError a
-runParser p srcname flags = Parsec.runParser p (initParseState flags) srcname
+runParser :: Parser a -> SourceName -> Settings -> [Lexeme] -> IO (Either ParseError a)
+runParser p srcname flags lexemes = do
+  initState <- initParseState flags srcname
+  Parsec.runParserT p initState srcname lexemes
 
 -- TODO: don't fail with a 'Doc ann', fail with an ErrMsg
 -- adjust lexer to fail with an ErrMsg as well.
 -- and record the refactoring in WYAH.
-testParser :: Parser a -> String -> Either (Doc ann) a
+testParser :: Parser a -> String -> IO (Either (Doc ann) a)
 testParser p input = do
-  lexemes <- mapLeft pretty $ lex "" input
-  case runParser (initPos *> p <* eof) "" defaultSettings lexemes of
-    Right v -> Right v
-    Left err -> Left $ prettyParseError err input lexemes
-  where
-    mapLeft :: (e -> e') -> Either e a -> Either e' a
-    mapLeft f (Left e) = Left (f e)
-    mapLeft _ (Right a) = Right a
+  case lex "" input of
+    Left err -> pure $ Left (pretty err)
+    Right lexemes ->
+      runParser (initPos *> p <* eof) "" defaultSettings lexemes >>= \case
+        Right v -> pure $ Right v
+        Left err -> pure $ Left $ prettyParseError err input lexemes
 
 initPos :: Parser ()
 initPos = do
   input <- getInput
   startPos <- getPosition
   case input of
-    [] -> return ()
+    [] -> pure ()
     ls -> setPosition $ posFromTok startPos undefined ls
 
 -----------------------------------------------------------------------------------------
@@ -366,14 +378,14 @@ initPos = do
 varid :: Parser ParsedName
 varid = flip label "identifier" $ do
   Located loc tok <- satisfy isVarIdToken
-  return $ case tok of
+  pure $ case tok of
     TokVarId name -> mkUnQual varName loc name
     TokQualVarId qual name -> mkQual varName loc (qual, name)
 
 varsym :: Parser ParsedName
 varsym = flip label "symbol" $ do
   Located loc tok <- satisfy isVarSymToken
-  return $ case tok of
+  pure $ case tok of
     TokVarSym name -> mkUnQual varName loc name
     TokQualVarSym qual name -> mkQual varName loc (qual, name)
 
@@ -383,7 +395,7 @@ var = varid <|> try (parens varsym)
 tyconid :: Parser ParsedName
 tyconid = flip label "type constructor" $ do
   Located loc tok <- satisfy isConIdToken
-  return $ case tok of
+  pure $ case tok of
     TokConId name -> mkUnQual tcName loc name
     TokQualConId qual name -> mkQual tcName loc (qual, name)
 
@@ -393,27 +405,27 @@ tyclsid = label tyconid "type class"
 dataconid :: Parser ParsedName
 dataconid = flip label "data constructor" $ do
   Located loc tok <- satisfy isConIdToken
-  return $ case tok of
+  pure $ case tok of
     TokConId name -> mkUnQual dataName loc name
     TokQualConId qual name -> mkQual dataName loc (qual, name)
 
 dataconsym :: Parser ParsedName
 dataconsym = flip label "data constructor (symbol)" $ do
   Located loc tok <- satisfy isConSymToken
-  return $ case tok of
+  pure $ case tok of
     TokConSym name -> mkUnQual dataName loc name
     TokQualConSym qual name -> mkQual dataName loc (qual, name)
 
 tyvarid :: Parser ParsedName
 tyvarid = flip label "type variable" $ do
   Located loc tok <- satisfy isVarIdToken
-  return $ case tok of
+  pure $ case tok of
     TokVarId name -> mkUnQual tvName loc name
 
-modlName :: Parser (Located Text)
+modlName :: Parser Text
 modlName = do
-  Located loc tok <- satisfy isConIdToken
-  return . Located loc $ case tok of
+  Located _ tok <- satisfy isConIdToken
+  pure $ case tok of
     TokConId name -> name
     TokQualConId p1 p2 -> p1 <> "." <> p2
 
@@ -454,7 +466,7 @@ charLiteral = do
     satisfy
       (\case TokLitChar _ -> True; _ -> False)
   let Right c = Parsec.parse (PT.charLiteral literalParsers) "" t
-  return c
+  pure c
 
 stringLiteral :: Parser Text
 stringLiteral = do
@@ -462,7 +474,7 @@ stringLiteral = do
     satisfy
       (\case TokLitString _ -> True; _ -> False)
   let Right s = Parsec.parse (PT.stringLiteral literalParsers) "" t
-  return $ T.pack s
+  pure $ T.pack s
 
 integer :: Parser Integer
 integer = do
@@ -470,7 +482,7 @@ integer = do
     satisfy
       (\case TokLitInteger _ -> True; _ -> False)
   let Right i = Parsec.parse (PT.integer literalParsers) "" t
-  return i
+  pure i
 
 float :: Parser Double
 float = do
@@ -478,4 +490,4 @@ float = do
     satisfy
       (\case TokLitFloat _ -> True; _ -> False)
   let Right f = Parsec.parse (PT.float literalParsers) "" t
-  return f
+  pure f
