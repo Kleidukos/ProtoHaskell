@@ -1,70 +1,101 @@
-module Compiler.Parser.Helpers
-  ( module Compiler.Parser.Helpers
-  , module Compiler.Parser.Lexer
-  , module Compiler.BasicTypes.SrcLoc
-  , module Compiler.BasicTypes.ParsedName
-  , module Compiler.BasicTypes.OccName
-  , module Compiler.Settings
-  , module Text.Parsec
-  , module Control.Monad
-  , module Data.Functor -- for $>
-  ) where
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
-import Prelude hiding (lex)
-
-import Control.Arrow ((>>>))
-import Control.Monad
-import Control.Monad.Identity
-import Data.Functor (($>))
-import Data.Maybe (isJust)
-import Data.Text (Text)
-import Data.Text qualified as T
-import Prettyprinter (Doc, Pretty (..))
+module Compiler.Parser.Helpers where
 
 import Control.Concurrent.Counter (Counter)
 import Control.Concurrent.Counter qualified as Counter
-import Text.Parsec hiding
-  ( anyToken
-  , label
-  , noneOf
-  , oneOf
-  , parse
-  , runParser
-  , satisfy
-  , token
-  , (<?>)
-  )
-import Text.Parsec qualified as Parsec
-import Text.Parsec.Language (GenLanguageDef)
-import Text.Parsec.Pos (newPos)
-import Text.Parsec.Token (GenTokenParser)
-import Text.Parsec.Token qualified as PT
+import Control.Monad
+import Control.Monad.State
+import Data.Function ((&))
+import Data.List.NonEmpty qualified as NE
+import Data.Maybe (catMaybes, isJust)
+import Data.Proxy
+import Data.Semigroup
+import Data.Set qualified as Set
+import Data.Text (Text)
+import Data.Text qualified as Text
+import Prettyprinter hiding (align, comma)
+import Prettyprinter.Render.String
+import System.IO.Unsafe
+import Text.Megaparsec hiding (State, Token, parse, satisfy, token)
+import Text.Megaparsec qualified as P
+import Text.Megaparsec.Char.Lexer qualified as L
+import Text.Megaparsec.Debug qualified as D
+import Prelude hiding (lex)
 
-import Compiler.BasicTypes.FastString (unpackFS)
+-- import Debug.Trace
+
+import Compiler.BasicTypes.FastString
 import Compiler.BasicTypes.Location
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.ParsedName
 import Compiler.BasicTypes.SrcLoc
-import Compiler.Parser.Errors
 import Compiler.Parser.Lexer
-import Compiler.Settings
-import System.IO.Unsafe (unsafePerformIO)
 
-type Parser a =
-  ParsecT
-    [Lexeme] -- Token stream
-    ParseState
-    IO
-    a
-
-data ParseState = ParseState
-  { compFlags :: Settings
-  , indentOrd :: IndentOrdering
-  , layoutContexts :: [LayoutContext]
-  , endOfPrevToken :: SrcLoc
-  , nodeIDSupply :: Counter
-  , locationMap :: LocationMap
+data TokStream = TokStream
+  { lexemes :: [Lexeme]
+  , source :: String
   }
+  deriving (Eq, Ord)
+
+instance Show TokStream where
+  show TokStream{lexemes} = show lexemes
+
+instance Stream TokStream where
+  type Token TokStream = Lexeme
+  type Tokens TokStream = [Lexeme]
+
+  tokensToChunk Proxy lexemes = lexemes
+  chunkToTokens Proxy lexemes = lexemes
+  chunkLength Proxy lexemes = length lexemes
+  chunkEmpty Proxy lexemes = null lexemes
+  take1_ s@TokStream{lexemes} = case lexemes of
+    [] -> Nothing
+    (l : ls) -> Just (l, s{lexemes = ls})
+  takeN_ n s@TokStream{lexemes}
+    | n <= 0 = Just ([], s)
+    | null lexemes = Nothing
+    | otherwise =
+        let (xs, ls) = splitAt n lexemes
+         in Just (xs, s{lexemes = ls})
+  takeWhile_ p s@TokStream{lexemes} =
+    let (xs, ls) = span p lexemes
+     in (xs, s{lexemes = ls})
+
+instance VisualStream TokStream where
+  showTokens _proxy tokenStream =
+    sconcat $
+      NE.map
+        ( \tok ->
+            renderString $ layoutPretty defaultLayoutOptions $ pretty $ unLoc tok
+        )
+        tokenStream
+
+instance TraversableStream TokStream where
+  reachOffset o pst@PosState{..} =
+    let rest = drop (o - pstateOffset) (lexemes pstateInput)
+        nextPos = case rest of
+          [] -> pstateSourcePos
+          (Located _ TokIndent : (Located s _) : _) ->
+            mkSrcPos $ srcSpanStart s
+          (x : _) -> mkSrcPos $ srcSpanStart $ getLoc x
+        currentLine = unPos (sourceLine nextPos) - 1
+        cLineSrc = case lines (source pstateInput) of
+          [] -> Nothing
+          ls -> case ls !! currentLine of
+            "" -> Nothing
+            s -> Just s
+     in (cLineSrc, pst{pstateInput = TokStream rest (source pstateInput)})
+
+mkSrcPos :: SrcLoc -> SourcePos
+mkSrcPos srcLoc =
+  SourcePos
+    (unpackFS $ unsafeLocFile srcLoc)
+    (mkPos $ unsafeLocLine srcLoc)
+    (mkPos $ unsafeLocCol srcLoc)
+
+type Parser a = ParsecT CustomError TokStream (State PState) a
 
 getFreshNodeID :: Parser NodeID
 getFreshNodeID = do
@@ -74,180 +105,114 @@ getFreshNodeID = do
 withNodeID :: (NodeID -> Parser a) -> Parser a
 withNodeID p = do
   nodeID <- getFreshNodeID
-  startPos <- getPosition
+  startPos <- getSourcePos
   let srcName = sourceName startPos
       startLine = sourceLine startPos
       startCol = sourceColumn startPos
-      startLoc = mkSrcLoc srcName startLine startCol
+      startLoc = mkSrcLoc srcName (unPos startLine) (unPos startCol)
   res <- p nodeID
   endPos <- gets endOfPrevToken
   modify $ \state -> state{locationMap = insertLocation nodeID (mkSrcSpan startLoc endPos) state.locationMap}
   pure res
 
-data IndentOrdering = Eq | Gt | Geq deriving (Eq, Ord, Show, Read, Enum, Bounded)
+data CustomError
+  = PopEmptyLayoutCtx
+  deriving (Eq, Ord, Show, Enum, Bounded)
 
-data LayoutContext
-  = Explicit
-  | Implicit Int
-  deriving (Eq, Ord, Show)
+instance ShowErrorComponent CustomError where
+  showErrorComponent PopEmptyLayoutCtx =
+    "Tried to pop a layout context, but there are no layout contexts"
 
-initParseState :: Settings -> FilePath -> IO ParseState
-initParseState flags path = do
+data PState = PState
+  { layout_ctx :: [LayoutContext]
+  , indentOrd :: Ordering
+  , endOfPrevToken :: SrcLoc
+  , nodeIDSupply :: Counter
+  , locationMap :: LocationMap
+  }
+
+data LayoutContext = Explicit | Implicit Pos deriving (Eq, Ord, Show)
+
+initPState :: FilePath -> IO PState
+initPState path = do
   nodeIDSupply <- Counter.new 0
-  pure $ ParseState flags Eq [] noSrcLoc nodeIDSupply (LocationMap path mempty)
+  pure $ PState [] EQ noSrcLoc nodeIDSupply (LocationMap path mempty)
+
+currentLayoutContext :: Parser (Maybe LayoutContext)
+currentLayoutContext = gets ((\case [] -> Nothing; (x : _) -> Just x) . layout_ctx)
 
 pushLayoutContext :: LayoutContext -> Parser ()
-pushLayoutContext ctx = modifyState $ \s@ParseState{layoutContexts} ->
-  s{layoutContexts = ctx : layoutContexts}
+pushLayoutContext ctx =
+  modify $ \s@PState{layout_ctx} -> s{layout_ctx = ctx : layout_ctx}
 
 popLayoutContext :: Parser ()
 popLayoutContext = do
-  ctx <- gets layoutContexts
+  ctx <- gets layout_ctx
   case ctx of
-    [] -> fail "Tried to pop a layout context, but there are no layout contexts"
-    (_ : ctxs) -> modify $ \s -> s{layoutContexts = ctxs}
+    [] -> customFailure PopEmptyLayoutCtx
+    (_ : ctxs) -> modify $ \s -> s{layout_ctx = ctxs}
 
-get :: Parser ParseState
-get = getState
+-- parse :: Parser a -> String -> String -> Either String a
+-- parse p fname source = do
+--   lexemes <- lex fname source
+--   let out =
+--         runParserT p fname (TokStream lexemes source)
+--           & flip evalState initPState
+--   case out of
+--     Left errBundle -> Left $ errorBundlePretty errBundle
+--     Right val -> Right val
 
-gets :: (ParseState -> a) -> Parser a
-gets f = f <$> get
-
-put :: ParseState -> Parser ()
-put = putState
-
-modify :: (ParseState -> ParseState) -> Parser ()
-modify = modifyState
-
-currentLayoutContext :: Parser (Maybe LayoutContext)
-currentLayoutContext = do
-  ctxs <- gets layoutContexts
-  pure $ case ctxs of
-    [] -> Nothing
-    (x : _) -> Just x
-
-label :: Parser a -> String -> Parser a
-label p expression = do
-  mctx <- currentLayoutContext
-  case mctx of
-    Nothing -> Parsec.label p expression
-    Just Explicit -> Parsec.label p expression
-    Just (Implicit n) -> labelWithIndentInfo p expression n
-  where
-    labelWithIndentInfo p expression' n = do
-      ord <- gets indentOrd
-      let ordPiece = case ord of
-            Eq -> show n
-            Gt -> "greater than " ++ show n
-            Geq -> "less than" ++ show n -- Shouldn't happen
-          indentPiece = "at indentation"
-      Parsec.label p $ unwords [expression', indentPiece, ordPiece]
-
-(<?>) = label
-infixl 0 <?> -- I disagree with this fixity but it's what Parsec uses
-
--- | Anticipate a user error, producing an error like:
--- "unexpected <token>, perhaps you meant <msg>"
-anticipate :: Token -> String -> Parser a
-anticipate t msg = do
-  lookAhead $ token t
-  unexpected $ showTokenPretty t ++ ", perhaps you meant " ++ msg ++ "?"
-
-anticipateOp :: String -> String -> Parser a
-anticipateOp op = anticipate (reservedOpToTok op)
-
-instance HasSettings (Parsec [Lexeme] ParseState) where
-  getSettings = compFlags <$> getState
-
-{- NOTE: [Overlapping Show instance for Lexeme]
-
-For some reason, some parsec combinators seem to enforce a Show instance on Lexeme
-which they then use inside `unexpected` messages. This is catastrophic!
-Bonus points for switching to `Megaparsec` if version 8 can handle custom streams properly.
-
-To remedy this, we have to overlap the existing (informative) show instance for Lexeme
-in order to be able to guarantee that the user sees pretty-printed error messages.
-
--}
-instance {-# OVERLAPPING #-} Show (GenLocated SrcSpan Token) where
-  show (Located _ TokIndent) = "indentation"
-  show (Located _ t) = showTokenPretty t
-
------------------------------------------------------------------------------------------
--- Primitive parsers for our Tokens
------------------------------------------------------------------------------------------
+-- updatePos :: Parser ()
+-- updatePos = do
+--     ls <- lexemes <$> getInput
+--     prevLine <- unPos . sourceColumn <$> getSourcePos
+--     unless (null ls) $ do
+--     let srcSpan = case ls of
+--             (Located _ TokIndent : Located s _ : _) -> s
+--             (Located s _ : _) -> s
+--         nextLoc = srcSpanStart srcSpan
+--         nextSrcPos = mkSrcPos nextLoc
+--     updateParserState (\s@P.State{ statePosState } ->
+--         let newStatePosState = statePosState{ pstateSourcePos = nextSrcPos }
+--         in s{ statePosState = newStatePosState })
 
 satisfy :: (Token -> Bool) -> Parser Lexeme
-satisfy p = try $ guardIndentation *> satisfyNoIndentGuard p <* setIndentOrdGT
+satisfy p = do
+  D.dbg "analyze" $ do
+    st <- getParserState
+    return (stateOffset st, statePosState st)
+  try $ guardIndentation >> P.satisfy (p . unLoc) <* setOrdGT
   where
-    setIndentOrdGT = modify $ \s -> s{indentOrd = Gt}
-
--- | This parser is unsafe, as it breaks the guarantees we make about
--- checking indentation. However it is more efficient when it is known
--- that an indentation check should not happen. Use with caution!
-satisfyNoIndentGuard :: (Token -> Bool) -> Parser Lexeme
-satisfyNoIndentGuard p = do
-  lexeme@(Located pos _) <-
-    Parsec.tokenPrim
-      (unLoc >>> showTokenPretty)
-      posFromTok
-      testTok
-  modifyState $ \s -> s{endOfPrevToken = srcSpanEnd pos}
-  pure lexeme
-  where
-    testTok t = if (p . unLoc) t then Just t else Nothing
-
-posFromTok :: SourcePos -> t -> [Lexeme] -> SourcePos
-posFromTok old _ [] = old
-posFromTok a b (Located _ TokIndent : ls) = posFromTok a b ls
-posFromTok old _ (Located pos _ : _)
-  | isGoodSrcSpan pos = mkSrcPos $ srcSpanStart pos
-  | otherwise = old
-
-mkSrcPos :: SrcLoc -> SourcePos
-mkSrcPos loc =
-  let file = unsafeLocFile loc
-      line = unsafeLocLine loc
-      col = unsafeLocCol loc
-      new = newPos (unpackFS file) line col
-   in new
+    setOrdGT = modify $ \s -> s{indentOrd = GT}
 
 guardIndentation :: Parser ()
-guardIndentation = do
-  check <- optionMaybe $ satisfyNoIndentGuard (== TokIndent)
-  ord <- gets indentOrd
-  when (isJust check || ord == Eq) $ do
-    mr <- currentLayoutContext
-    case mr of
-      Nothing -> pure ()
-      Just Explicit -> pure ()
-      Just (Implicit r) -> do
-        c <- sourceColumn <$> getPosition
-        let compare = case ord of
-              Eq -> (==)
-              Gt -> (>)
-              Geq -> (>=)
-        unless
-          (c `compare` r)
-          ( if ord == Eq
-              then
-                unexpected "indentation"
-                  Parsec.<?> "indentation of "
-                    ++ show r
-                    ++ " (got "
-                    ++ show c
-                    ++ ")"
-              else unexpected "indentation"
-          )
+guardIndentation = D.dbg "guardIndentation" $ do
+  check <- optional $ P.satisfy (\t -> unLoc t == TokIndent)
+  when (isJust check) $ do
+    mlc <- currentLayoutContext
+    case mlc of
+      Nothing -> return ()
+      Just Explicit -> return ()
+      Just (Implicit indent) -> implicit indent
+  where
+    implicit :: Pos -> Parser ()
+    implicit indent = do
+      ord <- D.dbg "gets indentOrd" $ gets indentOrd
+      D.dbg "current indent" L.indentLevel
+      void $ L.indentGuard (return ()) ord indent
 
 token :: Token -> Parser Lexeme
-token t = satisfy (== t) <?> showTokenPretty t
+token t = satisfy (== t) <?> pretty t & show
+
+---------------------------------------------------------------------------------------
+-- Helper Combinators
+---------------------------------------------------------------------------------------
 
 oneOf :: [Token] -> Parser Lexeme
 oneOf ts = satisfy (`elem` ts)
 
 noneOf :: [Token] -> Parser Lexeme
-noneOf ts = satisfy (`notElem` ts)
+noneOf ts = satisfy (not . (`elem` ts))
 
 anyToken :: Parser Lexeme
 anyToken = satisfy (const True)
@@ -282,213 +247,121 @@ commaSep1 p = sepBy1 p comma
 semicolon :: Parser ()
 semicolon = void $ token TokSemicolon
 
-optSemi :: Parser ()
-optSemi = optional semicolon
-
-stmtSep :: Parser a -> Parser [a]
-stmtSep p = many semicolon >> p `sepEndBy` many1 semicolon
-
-stmtSep1 :: Parser a -> Parser [a]
-stmtSep1 p = many semicolon >> p `sepEndBy1` many1 semicolon
-
------------------------------------------------------------------------------------------
--- Implementing Layout Sensitivity
------------------------------------------------------------------------------------------
-
--- | Forces the next token to be aligned with the reference column.
--- Alignment will be checked even if the next token is not TokIndent.
-align :: Parser ()
-align = modify $ \s -> s{indentOrd = Eq}
-
--- | Allows the next token to be either aligned with the reference column or further indented.
-maybeAlign :: Parser ()
-maybeAlign = modify $ \s -> s{indentOrd = Geq}
-
--- | Parses a block of parser 'p'. A "block" can be either explicit or implicit.
--- An explicit block is surrounded by '{' and '}' and 'p' must be separated by semicolons.
--- An implicit block is denoted by layout rules, and separate instance of 'p' on the same
--- line (or linefolded) must be separated by semicolons.
-block :: Parser a -> Parser [a]
-block p = explicitBlock <|> implicitBlock
-  where
-    explicitBlock =
-      between
-        (token TokLBrace >> pushLayoutContext Explicit)
-        (token TokRBrace >> popLayoutContext)
-        $ stmtSep p
-    implicitBlock =
-      between openImplicit closeImplicit $
-        concat <$> many (align >> stmtSep1 p) <|> pure []
-
--- | The same as 'block', but requires at least one instance of 'p'.
-block1 :: Parser a -> Parser [a]
-block1 p = explicitBlock1 <|> implicitBlock1
-  where
-    explicitBlock1 =
-      between
-        (token TokLBrace >> pushLayoutContext Explicit)
-        (token TokRBrace >> popLayoutContext)
-        $ stmtSep1 p
-
-    implicitBlock1 =
-      between openImplicit closeImplicit $
-        concat <$> many1 (align >> stmtSep1 p)
-
--- | Opens an implicit block. Always succeeds and modifies the LayoutContexts.
-openImplicit = do
-  c <- sourceColumn <$> getPosition
-  pushLayoutContext $ Implicit c
-
--- | Closes an implicit block. Always succeeds and modifies the LayoutContexts.
-closeImplicit = popLayoutContext
-
-
------------------------------------------------------------------------------------------
--- Running Parsers
------------------------------------------------------------------------------------------
-
-runParser :: Parser a -> SourceName -> Settings -> [Lexeme] -> IO (Either ParseError a)
-runParser p srcname flags lexemes = do
-  initState <- initParseState flags srcname
-  Parsec.runParserT p initState srcname lexemes
-
--- TODO: don't fail with a 'Doc ann', fail with an ErrMsg
--- adjust lexer to fail with an ErrMsg as well.
--- and record the refactoring in WYAH.
-testParser :: Parser a -> String -> IO (Either (Doc ann) a)
-testParser p input = do
-  case lex "" input of
-    Left err -> pure $ Left (pretty err)
-    Right lexemes ->
-      runParser (initPos *> p <* eof) "" defaultSettings lexemes >>= \case
-        Right v -> pure $ Right v
-        Left err -> pure $ Left $ prettyParseError err input lexemes
-
-initPos :: Parser ()
-initPos = do
-  input <- getInput
-  startPos <- getPosition
-  case input of
-    [] -> pure ()
-    ls -> setPosition $ posFromTok startPos undefined ls
-
------------------------------------------------------------------------------------------
---  Names
------------------------------------------------------------------------------------------
-
 varid :: Parser ParsedName
-varid = flip label "identifier" $ do
+varid = do
   Located loc tok <- satisfy isVarIdToken
-  pure $ case tok of
+  return $ case tok of
     TokVarId name -> mkUnQual varName loc name
     TokQualVarId qual name -> mkQual varName loc (qual, name)
 
 varsym :: Parser ParsedName
-varsym = flip label "symbol" $ do
+varsym = do
   Located loc tok <- satisfy isVarSymToken
-  pure $ case tok of
+  return $ case tok of
     TokVarSym name -> mkUnQual varName loc name
     TokQualVarSym qual name -> mkQual varName loc (qual, name)
 
-var :: Parser ParsedName
-var = varid <|> try (parens varsym)
-
 tyconid :: Parser ParsedName
-tyconid = flip label "type constructor" $ do
+tyconid = do
   Located loc tok <- satisfy isConIdToken
-  pure $ case tok of
+  return $ case tok of
     TokConId name -> mkUnQual tcName loc name
     TokQualConId qual name -> mkQual tcName loc (qual, name)
 
 tyclsid :: Parser ParsedName
-tyclsid = label tyconid "type class"
+tyclsid = tyconid
 
 dataconid :: Parser ParsedName
-dataconid = flip label "data constructor" $ do
+dataconid = do
   Located loc tok <- satisfy isConIdToken
-  pure $ case tok of
+  return $ case tok of
     TokConId name -> mkUnQual dataName loc name
     TokQualConId qual name -> mkQual dataName loc (qual, name)
 
 dataconsym :: Parser ParsedName
-dataconsym = flip label "data constructor (symbol)" $ do
+dataconsym = do
   Located loc tok <- satisfy isConSymToken
-  pure $ case tok of
+  return $ case tok of
     TokConSym name -> mkUnQual dataName loc name
     TokQualConSym qual name -> mkQual dataName loc (qual, name)
 
 tyvarid :: Parser ParsedName
-tyvarid = flip label "type variable" $ do
+tyvarid = do
   Located loc tok <- satisfy isVarIdToken
-  pure $ case tok of
+  return $ case tok of
     TokVarId name -> mkUnQual tvName loc name
 
 modlName :: Parser Text
 modlName = do
   Located _ tok <- satisfy isConIdToken
-  pure $ case tok of
+  return $ case tok of
     TokConId name -> name
     TokQualConId p1 p2 -> p1 <> "." <> p2
 
------------------------------------------------------------------------------------------
--- Parsers for string literal, char literal, int literal, and float literal values
------------------------------------------------------------------------------------------
+block :: Parser a -> Parser [a]
+block p =
+  (catMaybes <$>) $
+    explicitBlock <|> implicitBlock
+  where
+    explicitBlock =
+      between openExplicit closeExplicit $
+        optional p `sepBy` semicolon
 
--- We 'cheat' here by using Text.Parsec.Token to generate Haskell Standard
--- compliant parsers for these objects
+    implicitBlock =
+      between openImplicit closeImplicit $
+        P.many $
+          align $
+            Just <$> p
 
-type LanguageDef = GenLanguageDef Text () Identity
+openExplicit = do
+  token TokLBrace
+  pushLayoutContext Explicit
 
--- Copy of the Text.Parsec.Language.emptyDef, except works with Data.Text
-emptyDef :: LanguageDef
-emptyDef =
-  PT.LanguageDef
-    { PT.commentStart = ""
-    , PT.commentEnd = ""
-    , PT.commentLine = ""
-    , PT.nestedComments = True
-    , PT.identStart = letter <|> char '_'
-    , PT.identLetter = alphaNum <|> Parsec.oneOf "_'"
-    , PT.opStart = PT.opLetter emptyDef
-    , PT.opLetter = Parsec.oneOf ":!#$%&*+./<=>?@\\^|-~"
-    , PT.reservedOpNames = []
-    , PT.reservedNames = []
-    , PT.caseSensitive = True
-    }
+closeExplicit = do
+  token TokRBrace
+  popLayoutContext
 
-literalParsers :: GenTokenParser Text () Identity
-literalParsers = PT.makeTokenParser emptyDef
+openImplicit = do
+  current <- L.indentLevel
+  pushLayoutContext $ Implicit current
 
--- We can guarantee that the 'parse' call succeeds, because our lexer would
--- not have created a 'TokLitChar' if it was not a lexically valid char.
-charLiteral :: Parser Char
+closeImplicit = popLayoutContext
+
+align :: Parser a -> Parser a
+align = (>>) (modify $ \s -> s{indentOrd = EQ})
+
 charLiteral = do
-  Located _ (TokLitChar t) <-
-    satisfy
-      (\case TokLitChar _ -> True; _ -> False)
-  let Right c = Parsec.parse (PT.charLiteral literalParsers) "" t
-  pure c
+  (Located _ (TokLitChar t)) <- satisfy $
+    \case
+      TokLitChar _ -> True
+      _ -> False
+  let Right r = P.parse (L.charLiteral @Char) "" t
+  pure r
+
+expectedChar :: Char -> Parser Char
+expectedChar c = do
+  x@(Located _ (TokLitChar t)) <- satisfy $
+    \case
+      TokLitChar _ -> True
+      _ -> False
+  if Text.singleton c == t
+    then pure c
+    else failure (Just (Tokens $ NE.singleton x)) (Set.singleton $ Tokens $ NE.singleton x)
 
 stringLiteral :: Parser Text
 stringLiteral = do
   Located _ (TokLitString t) <-
     satisfy
       (\case TokLitString _ -> True; _ -> False)
-  let Right s = Parsec.parse (PT.stringLiteral literalParsers) "" t
-  pure $ T.pack s
+  s <- do
+    expectedChar '"'
+    manyTill charLiteral (expectedChar '"')
+  pure $ Text.pack s
 
 integer :: Parser Integer
 integer = do
   Located _ (TokLitInteger t) <-
     satisfy
       (\case TokLitInteger _ -> True; _ -> False)
-  let Right i = Parsec.parse (PT.integer literalParsers) "" t
+  let Right i = P.parse (L.decimal @Char) "" t
   pure i
-
-float :: Parser Double
-float = do
-  Located _ (TokLitFloat t) <-
-    satisfy
-      (\case TokLitFloat _ -> True; _ -> False)
-  let Right f = Parsec.parse (PT.float literalParsers) "" t
-  pure f

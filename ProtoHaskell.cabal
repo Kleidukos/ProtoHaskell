@@ -42,6 +42,7 @@ common ghc-options
     OverloadedRecordDot
     OverloadedStrings
     PatternGuards
+    RecordWildCards
     TupleSections
     ViewPatterns
 
@@ -61,7 +62,6 @@ library
     Compiler.Parser.Errors
     Compiler.Parser.Helpers
     Compiler.Parser.Lexer
-    Compiler.Parser.MegaParser
     Compiler.Parser.Parser
     Compiler.Parser.Pattern
     Compiler.PhCore
@@ -91,7 +91,6 @@ library
     , megaparsec
     , mtl
     , multiset
-    , parsec
     , pretty-simple
     , prettyprinter
     , prettyprinter-ansi-terminal
@@ -112,7 +111,6 @@ executable phc
     , containers
     , directory
     , filepath
-    , parsec
     , prettyprinter-ansi-terminal
     , ProtoHaskell
     , text
@@ -125,8 +123,8 @@ test-suite phc-test
   type:           exitcode-stdio-1.0
   main-is:        Spec.hs
   other-modules:
-    Compiler.ParserTest
     Compiler.LexerTest
+    Compiler.ParserTest
     Compiler.RenamerTest
     Compiler.TypeCheckerTest
     Test

@@ -7,7 +7,7 @@ import Test
 import Test.Tasty
 import Test.Tasty.Golden (goldenVsFileDiff)
 
-import Compiler.Parser.Lexer 
+import Compiler.Parser.Lexer
 import Compiler.Renamer.Utils (pShowNoColorIndent2)
 
 spec :: TestTree

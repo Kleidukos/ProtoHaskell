@@ -1,8 +1,12 @@
 module Compiler.Parser.Pattern (parse) where
 
 import Compiler.BasicTypes.Location
+import Compiler.BasicTypes.ParsedName
 import Compiler.Parser.Helpers
+import Compiler.Parser.Lexer
 import Compiler.PhSyn.PhExpr
+import Data.Functor (($>))
+import Text.Megaparsec (many, (<?>), (<|>))
 
 parse :: Parser (Pat ParsedName)
 parse = withNodeID $ \nodeID ->
@@ -27,6 +31,6 @@ literalPattern :: NodeID -> Parser (Pat ParsedName)
 literalPattern nodeID =
   (PLit nodeID <$>) $
     LitInt <$> integer
-      <|> LitFloat <$> float
+      -- <|> LitFloat <$> float
       <|> LitChar <$> charLiteral
       <|> LitString <$> stringLiteral

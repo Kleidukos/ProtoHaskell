@@ -1,53 +1,43 @@
 module Compiler.Parser.Parser where
 
 import Prelude hiding (lex)
+
 import Data.Text (Text)
 import Prettyprinter (Doc, pretty)
-import Control.Applicative
-import Control.Monad.State.Strict
-import Text.Megaparsec (eof, sepBy1, try, (<?>))
-import Text.Megaparsec.Error
-import Text.Megaparsec qualified as Megaparsec
-import Text.Megaparsec.Internal
 
 import Compiler.BasicTypes.Location
-import Compiler.BasicTypes.ParsedName
+import Compiler.Parser.Errors
 import Compiler.Parser.Helpers
-import Compiler.Parser.Lexer
 import Compiler.Parser.Pattern qualified as Pattern
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhSyn
 import Compiler.PhSyn.PhType
 
-parse :: FilePath -> String -> IO (Either (Doc ann) (PhModule ParsedName))
-parse srcname input = case lex srcname input of
-  Left err -> pure $ Left (pretty err)
-  Right lexemes -> do
-    initState <- initPState srcname
-    _ (runParserT (moduleParser <* eof) srcname (TokStream lexemes srcname)) initState >>= \case
-      Right v -> pure $ Right v
-      Left errBundle -> pure $ Left $ pretty $ errorBundlePretty errBundle
+-----------------------------------------------------------------------------------------
+-- Main parse driver
+-----------------------------------------------------------------------------------------
 
-runParserT :: FilePath -> Parser a -> State PState (Maybe a, Maybe w)
-runParserT path p = do
-  let s = initPState path
-  (Reply s' _ result) <- Megaparsec.runParsecT p s
-  let toBundle es =
-        ParseErrorBundle
-          { bundleErrors = NE.sortWith Megaparsec.errorOffset es
-          , bundlePosState = Megaparsec.statePosState s
-          }
-  pure $ case result of
-    Error fatalError ->
-      (Nothing, Just $ ParsingError $ toBundle $ fatalError :| Megaparsec.stateParseErrors s')
-    OK _ x ->
-      let nonFatalErrs = viaNonEmpty toBundle (Megaparsec.stateParseErrors s')
-       in (Just x, ParsingError <$> nonFatalErrs)
+-- | Takes a filename, compiler flags, and input source.
+-- Outputs either an error (already pretty printed) or a PhModule.
+
+-- TODO: fail with ErrMsg instead of 'Doc'
+parse :: SourceName -> Settings -> String -> IO (Either (Doc ann) (PhModule ParsedName))
+parse srcname flags input = case lex srcname input of
+  Left err -> pure $ Left (pretty err)
+  Right lexemes ->
+    runParser (moduleParser <* eof) srcname flags lexemes >>= \case
+      Right v -> pure $ Right v
+      Left err -> pure $ Left $ prettyParseError err input lexemes
+
+-----------------------------------------------------------------------------------------
+-- Component Parsers
+-----------------------------------------------------------------------------------------
+{-HLINT ignore "Use <$>" -}
 
 moduleParser :: Parser (PhModule ParsedName)
 moduleParser = withNodeID $ \nodeID ->
   Module nodeID
-    <$> optional moduleHeader
+    <$> optionMaybe moduleHeader
     <*> parseTopDecls
 
 moduleHeader :: Parser Text
@@ -65,6 +55,8 @@ parseTopDecl = withNodeID $ \nodeID ->
   parseDataDecl nodeID
     <|> parseSignature nodeID
     <|> parseBinding nodeID
+    -- <|> parseClassDecl
+    -- <|> parseInstanceDecl
     <?> "top-level declaration"
 
 parseDataDecl :: NodeID -> Parser (PhDecl ParsedName)
@@ -94,6 +86,19 @@ parseTypeSignature = withNodeID $ \nodeID -> do
   reservedOp "::"
   TypeSig nodeID name <$> parseContextType
 
+-- parseFixitySignature :: Parser (Sig ParsedName)
+-- parseFixitySignature =
+--   FixitySig
+--     <$> parseFixityKeyword
+--     <*> (maybe 9 fromInteger <$> optionMaybe integer)
+--     <*> commaSep1 (varsym <|> backticks varid)
+
+-- parseFixityKeyword :: Parser Assoc
+-- parseFixityKeyword =
+--   (reserved "infix" $> Infix)
+--     <|> (reserved "infixl" $> InfixL)
+--     <|> (reserved "infixr" $> InfixR)
+
 parseBinding :: NodeID -> Parser (PhDecl ParsedName)
 parseBinding nodeID = fmap (Binding nodeID) parseBind
 
@@ -110,6 +115,30 @@ parseFunBinding = withNodeID $ \nodeID -> do
 parsePatternBinding :: Parser (PhBind ParsedName)
 parsePatternBinding = withNodeID $ \nodeID ->
   PatBind nodeID <$> Pattern.parse <*> parseRHS LetCtxt
+
+-- parsePatternBinding :: Parser (PhBind ParsedName)
+-- parsePatternBinding = PatBind <$> Pattern.parseLocated <*> locate (parseRHS LetCtxt)
+
+-- emptyLocalBinds :: PhLocalBinds ParsedName
+-- emptyLocalBinds = LocalBinds [] []
+
+-- parseClassDecl :: Parser (PhDecl ParsedName)
+-- parseClassDecl =  do
+--   reserved "class"
+--   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> pure []
+--   ClassDecl ctx
+--     <$> tyclsid -- renamer has to check that this is unqualified
+--     <*> tyvarid
+--     <*> ((reserved "where" *> parseLocalBinds) <|> locate (pure emptyLocalBinds))
+
+-- parseInstanceDecl :: Parser (PhDecl ParsedName)
+-- parseInstanceDecl =  do
+--   reserved "instance"
+--   ctx <- try (parseSimpleContext <* reservedOp "=>") <|> pure []
+--   InstDecl ctx
+--     <$> tyclsid
+--     <*> parseType
+--     <*> ((reserved "where" *> parseLocalBinds) <|> locate (pure emptyLocalBinds))
 
 -- | Parses a single match which will eventually be part of a match group.
 --
@@ -132,7 +161,7 @@ parseRHS ctx = withNodeID $ \nodeID -> do
   expr <- parseGRHS ctx
   mLocalBinds <-
     if ctx /= LamCtxt
-      then optional (token TokWhere >> parseLocalBinds) <?> "where clause"
+      then optionMaybe (token TokWhere >> parseLocalBinds) <?> "where clause"
       else pure Nothing
   pure RHS{nodeID, expr, localBinds = flatten nodeID mLocalBinds}
   where
@@ -204,7 +233,7 @@ parseExpr :: Parser (PhExpr ParsedName)
 parseExpr = withNodeID $ \nodeID ->
   do
     expression <- parseInfixExp
-    mCType <- optional $ reservedOp "::" >> parseContextType
+    mCType <- optionMaybe $ reservedOp "::" >> parseContextType
     pure $ case mCType of
       Nothing -> expression
       Just ty -> Typed nodeID ty expression
@@ -335,7 +364,7 @@ parseCommaSeq :: PhExpr ParsedName -> PhExpr ParsedName -> Parser (PhExpr Parsed
 parseCommaSeq e1 e2 = withNodeID $ \nodeID ->
   ArithSeq nodeID <$> do
     reservedOp ".."
-    e3 <- optional parseLocExpr
+    e3 <- optionMaybe parseLocExpr
     withNodeID $ \nodeID2 -> do
       case e3 of
         Nothing -> pure $ FromThen nodeID2 e1 e2
@@ -345,7 +374,7 @@ parseDotsSeq :: PhExpr ParsedName -> Parser (PhExpr ParsedName)
 parseDotsSeq expression = withNodeID $ \nodeID ->
   ArithSeq nodeID <$> do
     reservedOp ".."
-    e2 <- optional parseLocExpr
+    e2 <- optionMaybe parseLocExpr
     withNodeID $ \nodeID2 -> do
       case e2 of
         Nothing -> pure $ From nodeID2 expression
@@ -356,6 +385,13 @@ parseDoStmts = block1 parseDoStmt
 
 parseDoStmt :: Parser (Stmt ParsedName)
 parseDoStmt =
+  -- ( try
+  --     ( do
+  --         pat <- Pattern.parseLocated
+  --         reservedOp "<-"
+  --         e <- parseLocExpr
+  --         pure $ SGenerator pat e
+  --     )
   try (reserved "let" *> (SLet <$> parseLocalBinds))
     <|> SExpr <$> parseLocExpr
     <?> "statement of a do block"
@@ -370,6 +406,40 @@ parseCaseAlts = withNodeID $ \nodeID -> MG nodeID <$> block1 (parseMatch CaseCtx
 -- | Parses a type with context, like Eq a => a -> a -> Bool
 parseContextType :: Parser (PhType ParsedName)
 parseContextType = parseType
+
+-- mctx <- optionMaybe $ try $ parseContext <* reservedOp "=>"
+-- unLoc <$> parseType
+
+-- pure $ case mctx of
+--   Nothing -> unLoc ty
+--   Just preds -> PhQualTy preds ty
+
+-- -- | Parses a context, but NOT the predicate arrow, =>
+-- parseContext :: Parser [Pred ParsedName]
+-- parseContext =
+--   pure <$> parsePred <|> parens (commaSep parsePred)
+
+-- -- | Parses an individual predicate, like Eq a
+-- parsePred :: Parser (Pred ParsedName)
+-- parsePred =
+--   try parseSimplePred
+--     <|> do
+--       cls <- tyclsid
+--       ty <- parens $ do
+--         tyvar <-  PhVarTy <$> tyvarid
+--         args <- many1 parseAType
+--         pure $ foldl1 mkPhAppTy (tyvar : args)
+--       pure $ IsIn cls (unLoc ty)
+
+-- | Parses a simple context, like those legal in an instance head.
+-- Unlike 'parseContext', rejects types like 'Eq (m a)'
+-- parseSimpleContext :: Parser [Pred ParsedName]
+-- parseSimpleContext =
+--   pure <$> parseSimplePred <|> parens (commaSep parseSimplePred)
+
+-- -- | Parses a simple predicate, like 'Eq a'
+-- parseSimplePred :: Parser (Pred ParsedName)
+-- parseSimplePred = IsIn <$> tyclsid <*> (PhVarTy <$> tyvarid)
 
 parseType :: Parser (PhType ParsedName)
 parseType = withNodeID $ \nodeID -> do
@@ -404,3 +474,7 @@ parseGTyCon = withNodeID $ \nodeID ->
       pure $ case len of
         0 -> PhBuiltInTyCon nodeID UnitTyCon
         _ -> PhBuiltInTyCon nodeID (TupleTyCon $ len + 1)
+
+-- TODO
+-- Once we have built-in representations for these types,
+-- the above should be replaced with those.
