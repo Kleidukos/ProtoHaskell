@@ -48,6 +48,12 @@ shouldSucceed =
         (successfulTests <> "operators.expected")
         (successfulTests <> "operators.actual")
         testOperators
+    , goldenVsFileDiff
+        "Case match"
+        (\ref new -> ["diff", "-u", ref, new])
+        (successfulTests <> "case-match.expected")
+        (successfulTests <> "case-match.actual")
+        testCaseMatch
     ]
 
 testBasic :: IO ()
@@ -77,3 +83,10 @@ testOperators = do
   contents <- readFile sourceFile
   result <- assertRight $ parse sourceFile defaultSettings contents
   TL.writeFile (successfulTests <> "operators.actual") (pShowNoColorIndent2 result)
+
+testCaseMatch :: IO ()
+testCaseMatch = do
+  let sourceFile = successfulTests <> "case-match.hs"
+  contents <- readFile sourceFile
+  result <- assertRight $ parse sourceFile defaultSettings contents
+  TL.writeFile (successfulTests <> "case-match.actual") (pShowNoColorIndent2 result)

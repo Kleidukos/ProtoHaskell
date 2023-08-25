@@ -5,10 +5,10 @@ import Data.Text (Text)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.PhSyn.PhType
 
+import Compiler.BasicTypes.Name
 import GHC.Records
 import Prettyprinter
 import Utils.Output
-import Compiler.BasicTypes.Name
 
 type LPhExpr name = Located (PhExpr name)
 data PhExpr name

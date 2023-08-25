@@ -12,6 +12,7 @@ import Effectful
 import Effectful.Error.Static (Error)
 
 import Compiler.BasicTypes.SrcLoc (unLoc)
+import Control.Monad (void)
 import Data.Function ((&))
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static (Reader)
@@ -60,9 +61,9 @@ runTypeChecker env action = do
 inferType :: PhExpr Name -> TypeChecker TypedExpr
 inferType = \case
   PhVar name -> do
-    lookedUpType <- lookupType name
+    lookedUpType <- lookupTypeOfName name
     pure $ TypedExpr lookedUpType (PhVar name)
-  PhLit lit -> do 
+  PhLit lit -> do
     synthesisedType <- synthLiteral lit
     pure $ TypedExpr synthesisedType (PhLit lit)
   Typed exprType expression -> do
@@ -70,8 +71,8 @@ inferType = \case
     pure $ TypedExpr checkedType (Typed exprType expression)
 
 -- | Lookup the type of a term
-lookupType :: Name -> TypeChecker (PhType Name)
-lookupType name = do
+lookupTypeOfName :: Name -> TypeChecker (PhType Name)
+lookupTypeOfName name = do
   Environment{types} <- State.get
   let result = Map.elems $ Map.filterWithKey (\tyName _ -> tyName.occ.nameFS == name.occ.nameFS) types
    in case result of
@@ -89,16 +90,31 @@ mkType name = pure $ PhVarTy name
 
 --- Checking
 
-checkType :: PhType Name -> PhExpr Name -> TypeChecker TypedExpr
-checkType typeToCheck = \case
-  PhLam matchGroup -> checkMatchGroup matchGroup
+compareType :: PhType Name -> PhType Name -> TypeChecker (PhType Name)
+compareType typeToCheck typeFromEnv
+  | typeToCheck == typeFromEnv = pure typeToCheck
+  | otherwise = Error.throwError $ TypeMismatch typeToCheck typeFromEnv
 
+-- checkType :: PhType Name -> PhExpr Name -> TypeChecker TypedExpr
+checkType typeToCheck = undefined
+
+-- checkType typeToCheck = \case
+-- PhLam matchGroup -> checkMatchGroup matchGroup
+--
 checkMatchGroup :: PhType Name -> MatchGroup Name -> TypeChecker TypedExpr
-checkMatchGroup typeToCheck mg = do 
+checkMatchGroup typeToCheck mg = undefined
 
-checkMatch :: PhType Name -> Match Name -> TypeChecker (Match Name)
-checkMatch typeToCheck (Match pats body) =
-  case typeToCheck of
-    PhFunTy ty1 ty2 -> 
-    
-  
+--
+-- checkMatch :: PhType Name -> Match Name -> TypeChecker (Match Name)
+-- checkMatch typeToCheck (Match pats body) =
+--   case typeToCheck of
+--     PhFunTy ty1 ty2 ->
+--
+checkPat :: PhType Name -> Pat Name -> TypeChecker (Pat Name)
+checkPat typeToCheck pat =
+  case pat of
+    PWildCard -> pure typeToCheck
+    PLit lit -> do
+      typeFromEnv <- synthLiteral lit
+      void $ compareType typeToCheck typeFromEnv
+      pure pat
