@@ -67,8 +67,8 @@ inferType = \case
     synthesisedType <- synthLiteral lit
     pure $ TypedExpr synthesisedType (PhLit lit)
   Typed exprType expression -> do
-    checkedType <- checkType (unLoc expression) (unLoc exprType)
-    pure $ TypedExpr checkedType (Typed exprType expression)
+    checkType (unLoc exprType) (unLoc expression)
+  e -> error $ "Did not implement inference for" <> show e
 
 -- | Lookup the type of a term
 lookupTypeOfName :: Name -> TypeChecker (PhType Name)
@@ -90,17 +90,25 @@ mkType name = pure $ PhVarTy name
 
 --- Checking
 
-compareType :: PhType Name -> PhType Name -> TypeChecker (PhType Name)
+compareType
+  :: PhType Name
+    -- ^ Type to check
+  -> PhType Name
+    -- ^ Type in the environment
+  -> TypeChecker (PhType Name)
 compareType typeToCheck typeFromEnv
   | typeToCheck == typeFromEnv = pure typeToCheck
   | otherwise = Error.throwError $ TypeMismatch typeToCheck typeFromEnv
 
--- checkType :: PhType Name -> PhExpr Name -> TypeChecker TypedExpr
-checkType typeToCheck = undefined
+checkType :: PhType Name -> PhExpr Name -> TypeChecker TypedExpr
+checkType typeToCheck expr =
+  case expr of
+    PhVar name -> do
+      (TypedExpr actualType expr') <- inferType (PhVar name)
+      void $ compareType typeToCheck actualType 
+      pure $ TypedExpr actualType expr'
+    _ -> error $ "Type checking not implement for " <> show expr
 
--- checkType typeToCheck = \case
--- PhLam matchGroup -> checkMatchGroup matchGroup
---
 checkMatchGroup :: PhType Name -> MatchGroup Name -> TypeChecker TypedExpr
 checkMatchGroup typeToCheck mg = undefined
 
@@ -113,8 +121,9 @@ checkMatchGroup typeToCheck mg = undefined
 checkPat :: PhType Name -> Pat Name -> TypeChecker (Pat Name)
 checkPat typeToCheck pat =
   case pat of
-    PWildCard -> pure typeToCheck
+    PWildCard -> pure pat
     PLit lit -> do
       typeFromEnv <- synthLiteral lit
       void $ compareType typeToCheck typeFromEnv
       pure pat
+    PCon constructorName parameters -> undefined
