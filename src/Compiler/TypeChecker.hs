@@ -92,9 +92,9 @@ mkType name = pure $ PhVarTy name
 
 compareType
   :: PhType Name
-    -- ^ Type to check
+  -- ^ Type to check
   -> PhType Name
-    -- ^ Type in the environment
+  -- ^ Type in the environment
   -> TypeChecker (PhType Name)
 compareType typeToCheck typeFromEnv
   | typeToCheck == typeFromEnv = pure typeToCheck
@@ -105,7 +105,7 @@ checkType typeToCheck expr =
   case expr of
     PhVar name -> do
       (TypedExpr actualType expr') <- inferType (PhVar name)
-      void $ compareType typeToCheck actualType 
+      void $ compareType typeToCheck actualType
       pure $ TypedExpr actualType expr'
     _ -> error $ "Type checking not implement for " <> show expr
 

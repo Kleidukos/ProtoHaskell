@@ -23,8 +23,6 @@ import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static qualified as Reader
 import Effectful.State.Static.Local qualified as State
 
--- import Debug.Trace
-
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.ParsedName
@@ -36,28 +34,32 @@ import Compiler.PhSyn.PhType
 import Compiler.Renamer.Types
 import Compiler.Renamer.Utils
 
--- import Data.Text (Text)
-
+import Compiler.Settings (Settings)
+import Data.Foldable (traverse_)
 import Data.Maybe (fromJust, mapMaybe)
 import Data.Vector (Vector)
 import Effectful.Error.Static
+import Prettyprinter
 import Utils.MonadUtils
+import Utils.Output
 
 runRenamer
-  :: Renamer a
+  :: Settings
+  -> Renamer a
   -> IO (Either (CallStack, RenamerError) a)
-runRenamer action = do
+runRenamer settings action = do
   uniqueSupply <- mkUniqueSupply RenameSection
   action
     & Reader.runReader uniqueSupply
     & Reader.runReader emptyRenamerContext
+    & Reader.runReader settings
     & State.evalState emptyTopLevelContext
     & Error.runError
     & runEff
 
-rename :: PhModule ParsedName -> IO (Either (CallStack, RenamerError) (PhModule Name))
-rename parsedModule =
-  runRenamer $
+rename :: Settings -> PhModule ParsedName -> IO (Either (CallStack, RenamerError) (PhModule Name))
+rename settings parsedModule = do
+  runRenamer settings $ do
     renamePhModule parsedModule
 
 -- Renaming ParsedName to Name --
@@ -104,6 +106,7 @@ renameParsedNameWithoutRegistering parsedName = do
 -- | Like 'renameParsedName' but do not add it to the bindings environment
 renameSigName :: ParsedName -> Renamer Name
 renameSigName parsedName = do
+  traceRenamer $ "Renaming signature name: " <> (outputLazy . pretty $ parsedName)
   unique <- nextUnique
   pure $
     Name
@@ -114,25 +117,33 @@ renameSigName parsedName = do
 
 renamePhModule :: PhModule ParsedName -> Renamer (PhModule Name)
 renamePhModule parsedModule = do
-  ensureTopLevelSignatures (parsedModule.modDecls)
+  traceRenamer $ "Entering " <> maybe "default module" (outputLazy . pretty) parsedModule.modName
+  ensureTopLevelSignatures parsedModule.modDecls
   renamedDecls <- traverse (mapLocM renamePhDecl) parsedModule.modDecls
   pure $! Module parsedModule.modName renamedDecls
 
 ensureTopLevelSignatures :: [LPhDecl ParsedName] -> Renamer ()
 ensureTopLevelSignatures decls = do
-  decls
-    & fmap unLoc
-    & filter (\decl -> isBinding decl || isSignature decl)
-    & traverse
-      ( \case
-          Binding binding -> Binding <$> renameTopLevelBinding binding
-          Signature sig -> Signature <$> renameTopLevelSig sig
-          _ -> undefined
-      )
+  traceRenamer "Gathering top-level signatures"
+  let lol =
+        decls
+          & fmap unLoc
+          & filter (\decl -> isBinding decl || isSignature decl)
+  traceRenamer $ outputLazy $ pretty lol
+  traverse_
+    ( \case
+        Binding binding -> Binding <$> renameTopLevelBinding binding
+        Signature sig -> do
+          Signature <$> renameTopLevelSig sig
+        _ -> undefined
+    )
+    lol
   TopLevelBindings{topLevelBindings, topLevelSignatures} <- State.get
+  printContext "Top-level signatures"
   forM_
     topLevelBindings
-    ( \name ->
+    ( \name -> do
+        traceRenamer $ "Checking top-level binding" <> (outputLazy . pretty $ name)
         unless (signatureMember name topLevelSignatures) $
           Error.throwError $
             NoTopLevelSignature name.occ.nameFS
@@ -149,8 +160,11 @@ ensureTopLevelSignatures decls = do
 -- of top-level type and term declaration,
 -- otherwise we would be getting duplicates.
 renamePhDecl :: PhDecl ParsedName -> Renamer (PhDecl Name)
-renamePhDecl (Binding bind) = Binding <$> renamePhBindWithoutRegisteringName bind
+renamePhDecl (Binding bind) = do
+  traceRenamer $ "Renaming binding: " <> (outputLazy . pretty $ bind)
+  Binding <$> renamePhBindWithoutRegisteringName bind
 renamePhDecl (Signature sig) = do
+  traceRenamer $ "Renaming signature: " <> (outputLazy . pretty $ sig)
   renamedSignature <- renameTopLevelSigWithoutRegistering sig
   pure $ Signature renamedSignature
 renamePhDecl decl =
@@ -158,7 +172,7 @@ renamePhDecl decl =
 
 renameMatchGroup :: MatchGroup ParsedName -> Renamer (MatchGroup Name)
 renameMatchGroup matchGroup = do
-  renamedAlternatives <- traverse (mapLocM renameMatch) (matchGroup.alternatives)
+  renamedAlternatives <- traverse (mapLocM renameMatch) matchGroup.alternatives
   pure $ MG renamedAlternatives matchGroup.context
 
 renameMatch :: Match ParsedName -> Renamer (Match Name)
@@ -178,8 +192,7 @@ renamePatWithoutRegisteringName (PVar name) =
 renamePatWithoutRegisteringName rest = traverse renameParsedName rest
 
 renameTopLevelPat :: Pat ParsedName -> Renamer (Pat Name)
-renameTopLevelPat (PVar name) = do
-  PVar <$> renameTopLevelName name
+renameTopLevelPat (PVar name) = PVar <$> renameTopLevelName name
 renameTopLevelPat rest = traverse renameParsedName rest
 
 renameRHS :: RHS ParsedName -> Renamer (RHS Name)
@@ -212,7 +225,7 @@ renameBinds (LocalBinds binds signatures) = do
     LocalBinds renamedBinds renamedSignatures
 
 guardForDuplicates :: [[LPhBind ParsedName]] -> Renamer [LPhBind ParsedName]
-guardForDuplicates groupedBinds =
+guardForDuplicates =
   concatMapM
     ( \bindList ->
         if length bindList > 1
@@ -222,10 +235,9 @@ guardForDuplicates groupedBinds =
             throwError (DuplicateBinding duplicateName duplicateSpans)
           else pure bindList
     )
-    groupedBinds
 
 groupBindsByName :: [LPhBind ParsedName] -> [[LPhBind ParsedName]]
-groupBindsByName binds = List.groupBy (\a b -> (unLoc a).name == (unLoc b).name) binds
+groupBindsByName = List.groupBy (\a b -> (unLoc a).name == (unLoc b).name)
 
 renamePhBind :: PhBind ParsedName -> Renamer (PhBind Name)
 renamePhBind (FunBind name matchGroup) = do
@@ -240,6 +252,7 @@ renamePhBind (PatBind pat body) = do
 
 renameTopLevelSig :: Sig ParsedName -> Renamer (Sig Name)
 renameTopLevelSig (TypeSig sigName sigType) = do
+  traceRenamer $ "Renaming top-level Signature: " <> (outputLazy . pretty $ TypeSig sigName sigType)
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
   addTopLevelSignature renamedSigName (unLoc renamedSigType)
@@ -248,6 +261,7 @@ renameTopLevelSig (TypeSig sigName sigType) = do
 
 renameTopLevelSigWithoutRegistering :: Sig ParsedName -> Renamer (Sig Name)
 renameTopLevelSigWithoutRegistering (TypeSig sigName sigType) = do
+  traceRenamer $ "Renaming top-level Signature without registering: " <> (outputLazy . pretty $ TypeSig sigName sigType)
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
   pure $
@@ -255,14 +269,17 @@ renameTopLevelSigWithoutRegistering (TypeSig sigName sigType) = do
 
 renameSig :: Sig ParsedName -> Renamer (Sig Name)
 renameSig (TypeSig sigName sigType) = do
+  traceRenamer $ "Renaming signature: " <> (outputLazy . pretty $ TypeSig sigName sigType)
   renamedSigName <- renameSigName sigName
   renamedSigType <- renameSigType sigType
   addTopLevelSignature renamedSigName (unLoc renamedSigType)
+  traceRenamer "Added top-level signature"
   pure $
     TypeSig renamedSigName renamedSigType
 
 renameSigType :: LPhType ParsedName -> Renamer (LPhType Name)
-renameSigType =
+renameSigType name = do
+  traceRenamer $ "Renaming signature type: " <> (outputLazy . pretty $ name)
   mapLocM
     ( \case
         PhVarTy parsedName -> PhVarTy <$> renameSigName parsedName
@@ -275,9 +292,11 @@ renameSigType =
         PhTupleTy parsedNames -> PhTupleTy <$> traverse renameSigType parsedNames
         PhParTy parsedName -> PhParTy <$> renameSigType parsedName
     )
+    name
 
 renameTopLevelBinding :: PhBind ParsedName -> Renamer (PhBind Name)
 renameTopLevelBinding (FunBind name matchGroup) = do
+  traceRenamer $ "Checking top-level binding" <> (outputLazy . pretty $ name)
   renamedName <- renameTopLevelName name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $

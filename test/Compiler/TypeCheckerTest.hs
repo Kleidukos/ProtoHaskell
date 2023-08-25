@@ -1,3 +1,6 @@
+{-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Compiler.TypeCheckerTest where
 
 import Data.Map.Strict qualified as Map
@@ -8,9 +11,13 @@ import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName hiding (varName)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
+import Compiler.Parser.Parser (parse)
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhType
+import Compiler.Renamer
+import Compiler.Settings (defaultSettings, setRenamerTracing)
 import Compiler.TypeChecker
+import PyF
 import Test
 
 spec :: TestTree
@@ -25,9 +32,13 @@ spec =
         , testCase "Float" testTypeSynthesisOnFloatLiteral
         ]
     , testGroup
-        "Type checking"
+        "Basic type checking"
         [ testCase "Var lookup" testLookupVar
         , testCase "Expression with type annotation" testAnnotatedExpr
+        ]
+    , testGroup
+        "Numeric operations"
+        [ testCase "Addition" testAddition
         ]
     ]
 
@@ -208,3 +219,16 @@ testAnnotatedExpr = do
     "Correct type inferred for myOtherVar :: Int"
     (TypedExpr expectedType (PhVar varName))
     result
+
+testAddition :: Assertion
+testAddition = do
+  let snippet1 =
+        [str|
+  module Snippet1 where
+
+    bar :: Int
+    bar = 3 + 2
+  |]
+  parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  renamed <- assertRight =<< rename (setRenamerTracing defaultSettings) parsedSnippet1
+  print renamed

@@ -3,11 +3,15 @@ module Utils.Output where
 import Data.Char (isSymbol)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Text.Lazy qualified as TL
 import Prettyprinter
-import Prettyprinter.Render.Text (renderStrict)
+import Prettyprinter.Render.Text (renderLazy, renderStrict)
 
 output :: Doc ann -> Text
 output doc = renderStrict (layoutPretty defaultLayoutOptions doc)
+
+outputLazy :: Doc ann -> TL.Text
+outputLazy doc = renderLazy (layoutPretty defaultLayoutOptions doc)
 
 output' :: Doc ann -> Text
 output' doc = renderStrict (layoutSmart defaultLayoutOptions doc)
