@@ -23,6 +23,8 @@ import Data.Text
 import Effectful
 import Effectful.Reader.Static (Reader)
 import Prettyprinter
+import Data.Vector (Vector)
+import Data.Vector qualified as Vector
 
 -- | A 'Name' identifies an entity.
 -- It appears in the AST after the Renamer has turned all 'ParsedName's
@@ -99,3 +101,13 @@ mkTypeName fsName = do
 
 instance Pretty Name where
   pretty Name{occ} = pretty occ
+
+instance Pretty (Vector Name) where
+  pretty names = Vector.foldr1' (<>) $ intercalateVec ", " (fmap pretty names)
+
+intercalateVec :: Doc ann -> Vector (Doc ann) -> Vector (Doc ann)
+intercalateVec separator vector =
+  if Vector.null vector
+    then vector
+    else Vector.tail $ Vector.concatMap (\word -> Vector.fromList [separator, word]) vector
+

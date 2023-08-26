@@ -83,6 +83,7 @@ renameParsedName parsedName = do
 
 renameTopLevelName :: ParsedName -> Renamer Name
 renameTopLevelName parsedName = do
+  traceRenamer $ "Renaming top-level name " <> (outputLazy . pretty $ parsedName)
   unique <- nextUnique
   let name =
         Name
@@ -95,6 +96,7 @@ renameTopLevelName parsedName = do
 
 renameParsedNameWithoutRegistering :: ParsedName -> Renamer Name
 renameParsedNameWithoutRegistering parsedName = do
+  traceRenamer $ "Renaming ParsedName without registering: " <> (outputLazy . pretty $ parsedName)
   unique <- nextUnique
   pure $
     Name
@@ -182,18 +184,26 @@ renameMatch match = do
   pure $ Match renamedPatterns renamedRHS
 
 renamePat :: Pat ParsedName -> Renamer (Pat Name)
-renamePat (PVar name) =
+renamePat (PVar name) = do
+  traceRenamer $ "Renaming PVar " <> (outputLazy . pretty $ name)
   PVar <$> renameParsedName name
 renamePat rest = traverse renameParsedName rest
 
 renamePatWithoutRegisteringName :: Pat ParsedName -> Renamer (Pat Name)
-renamePatWithoutRegisteringName (PVar name) =
+renamePatWithoutRegisteringName (PVar name) = do
+  traceRenamer $ "Renaming PVar without registering: " <> (outputLazy . pretty $ name)
   PVar <$> renameParsedNameWithoutRegistering name
-renamePatWithoutRegisteringName rest = traverse renameParsedName rest
+renamePatWithoutRegisteringName rest =  do
+  traceRenamer $ "Renaming rest without registering: " <> (outputLazy . pretty $ rest)
+  traverse renameParsedName rest
 
 renameTopLevelPat :: Pat ParsedName -> Renamer (Pat Name)
-renameTopLevelPat (PVar name) = PVar <$> renameTopLevelName name
-renameTopLevelPat rest = traverse renameParsedName rest
+renameTopLevelPat (PVar name) = do 
+  traceRenamer $ "Renaming top-level PVar " <> (outputLazy . pretty $ name)
+  PVar <$> renameTopLevelName name
+renameTopLevelPat rest = do
+  traceRenamer $ "Renaming top-level PVar " <> (outputLazy . pretty $ rest)
+  traverse renameParsedName rest
 
 renameRHS :: RHS ParsedName -> Renamer (RHS Name)
 renameRHS rhs = do
@@ -202,21 +212,24 @@ renameRHS rhs = do
   pure $ RHS renamedRhs renamedLocalBinds
 
 renamePhExpr :: PhExpr ParsedName -> Renamer (PhExpr Name)
-renamePhExpr = \case
-  PhLit lit -> pure $ PhLit lit
-  PhVar name -> PhVar <$> guardNotFound name
-  PhLet binds cont -> do
-    renamedBinds <- traverse renameBinds binds
-    let (names :: Vector Name) =
-          mapMaybe (((.name)) . unLoc) (renamedBinds & unLoc & (\(LocalBinds phBinds _) -> phBinds))
-            & Vector.fromList
-    renamedCont <- addBindings names $ traverse renamePhExpr cont
-    pure $ PhLet renamedBinds renamedCont
-  parsedExpr -> do
-    renamePhExpr parsedExpr
+renamePhExpr phExpr =  do
+  traceRenamer $ "Renaming rest without registering: " <> (outputLazy . pretty $ phExpr)
+  case phExpr of
+    PhLit lit -> pure $ PhLit lit
+    PhVar name -> PhVar <$> guardNotFound name
+    PhLet binds cont -> do
+      renamedBinds <- traverse renameBinds binds
+      let (names :: Vector Name) =
+            mapMaybe (((.name)) . unLoc) (renamedBinds & unLoc & (\(LocalBinds phBinds _) -> phBinds))
+              & Vector.fromList
+      renamedCont <- addBindings names $ traverse renamePhExpr cont
+      pure $ PhLet renamedBinds renamedCont
+    parsedExpr -> do
+      renamePhExpr parsedExpr
 
 renameBinds :: PhLocalBinds ParsedName -> Renamer (PhLocalBinds Name)
 renameBinds (LocalBinds binds signatures) = do
+  traceRenamer $ "Renaming top-level PVar " <> (outputLazy . pretty $ binds)
   let groupedBinds = groupBindsByName binds
   uniqueBinds <- guardForDuplicates groupedBinds
   renamedBinds <- traverse (mapLocM renamePhBind) uniqueBinds
@@ -225,7 +238,8 @@ renameBinds (LocalBinds binds signatures) = do
     LocalBinds renamedBinds renamedSignatures
 
 guardForDuplicates :: [[LPhBind ParsedName]] -> Renamer [LPhBind ParsedName]
-guardForDuplicates =
+guardForDuplicates groupedBinds = do
+  traceRenamer "Guard for duplicates"
   concatMapM
     ( \bindList ->
         if length bindList > 1
@@ -234,18 +248,20 @@ guardForDuplicates =
             let duplicateSpans = bindList & fmap getLoc & Vector.fromList
             throwError (DuplicateBinding duplicateName duplicateSpans)
           else pure bindList
-    )
+    ) groupedBinds
 
 groupBindsByName :: [LPhBind ParsedName] -> [[LPhBind ParsedName]]
 groupBindsByName = List.groupBy (\a b -> (unLoc a).name == (unLoc b).name)
 
 renamePhBind :: PhBind ParsedName -> Renamer (PhBind Name)
 renamePhBind (FunBind name matchGroup) = do
+  traceRenamer $ "Renaming FunBind " <> (outputLazy . pretty $ name)
   renamedName <- renameParsedName name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
     FunBind renamedName renamedMatchGroup
 renamePhBind (PatBind pat body) = do
+  traceRenamer $ "Renaming PatBind " <> (outputLazy . pretty $ pat)
   renamedName <- traverse renamePat pat
   renamedBody <- traverse renameRHS body
   pure $ PatBind renamedName renamedBody
@@ -280,7 +296,7 @@ renameSig (TypeSig sigName sigType) = do
 renameSigType :: LPhType ParsedName -> Renamer (LPhType Name)
 renameSigType name = do
   traceRenamer $ "Renaming signature type: " <> (outputLazy . pretty $ name)
-  mapLocM
+  traverse
     ( \case
         PhVarTy parsedName -> PhVarTy <$> renameSigName parsedName
         PhBuiltInTyCon tyCon -> pure $ PhBuiltInTyCon tyCon
@@ -296,12 +312,13 @@ renameSigType name = do
 
 renameTopLevelBinding :: PhBind ParsedName -> Renamer (PhBind Name)
 renameTopLevelBinding (FunBind name matchGroup) = do
-  traceRenamer $ "Checking top-level binding" <> (outputLazy . pretty $ name)
+  traceRenamer $ "Renaming top-level FunBind" <> (outputLazy . pretty $ name) <> " with match group"
   renamedName <- renameTopLevelName name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
     FunBind renamedName renamedMatchGroup
 renameTopLevelBinding (PatBind pat body) = do
+  traceRenamer $ "Renaming top-level PatBind " <> (outputLazy . pretty $ pat)
   renamedName <- traverse renameTopLevelPat pat
   renamedBody <- traverse renameRHS body
   pure $ PatBind renamedName renamedBody

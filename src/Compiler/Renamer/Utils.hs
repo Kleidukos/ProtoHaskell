@@ -38,6 +38,7 @@ addBinding name action = do
 
 addBindings :: Vector Name -> Renamer a -> Renamer a
 addBindings names action = do
+  traceRenamer $ "Adding bindings " <> (outputLazy . pretty $ names)
   env <- Reader.ask @RenamerContext
   TopLevelBindings{topLevelBindings} <- State.get
   if any (\n -> bindingMember n topLevelBindings) names
@@ -79,7 +80,8 @@ addTopLevelSignature sigName sigType = do
     )
 
 addTopLevelBinding :: Name -> Renamer ()
-addTopLevelBinding name =
+addTopLevelBinding name = do
+  traceRenamer $ "Adding top-level binding " <> (outputLazy . pretty $ name)
   State.modifyM
     ( \env -> do
         if bindingMember name env.topLevelBindings

@@ -19,6 +19,7 @@ import Compiler.Settings (defaultSettings, setRenamerTracing)
 import Compiler.TypeChecker
 import PyF
 import Test
+import Text.Pretty.Simple
 
 spec :: TestTree
 spec =
@@ -226,7 +227,6 @@ testAddition = do
         [str|
   module Snippet1 where
 
-    bar :: Int
     bar = 3 + 2
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
