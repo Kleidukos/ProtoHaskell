@@ -123,7 +123,7 @@ printContext tag = do
   liftIO $
     TL.putStrLn $
       pShowNoColorIndent2
-        [("context" <> tag, context, "top_level_signatures" :: String, topLevelSignatures)]
+        [(tag, context, "top_level_signatures" :: String, topLevelSignatures)]
 
 pShowNoColorIndent2 :: (Show a) => a -> TL.Text
 pShowNoColorIndent2 =

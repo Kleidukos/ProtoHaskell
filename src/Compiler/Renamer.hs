@@ -15,13 +15,19 @@ module Compiler.Renamer
   ) where
 
 import Control.Monad
+import Data.Text.Lazy qualified as TL
+import Data.Foldable (traverse_)
 import Data.Function ((&))
 import Data.List qualified as List
+import Data.Maybe (fromJust, mapMaybe)
+import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Effectful
+import Effectful.Error.Static
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static qualified as Reader
 import Effectful.State.Static.Local qualified as State
+import Prettyprinter
 
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
@@ -35,11 +41,6 @@ import Compiler.Renamer.Types
 import Compiler.Renamer.Utils
 
 import Compiler.Settings (Settings)
-import Data.Foldable (traverse_)
-import Data.Maybe (fromJust, mapMaybe)
-import Data.Vector (Vector)
-import Effectful.Error.Static
-import Prettyprinter
 import Utils.MonadUtils
 import Utils.Output
 
@@ -198,7 +199,7 @@ renamePatWithoutRegisteringName rest =  do
   traverse renameParsedName rest
 
 renameTopLevelPat :: Pat ParsedName -> Renamer (Pat Name)
-renameTopLevelPat (PVar name) = do 
+renameTopLevelPat (PVar name) = do
   traceRenamer $ "Renaming top-level PVar " <> (outputLazy . pretty $ name)
   PVar <$> renameTopLevelName name
 renameTopLevelPat rest = do
@@ -213,7 +214,7 @@ renameRHS rhs = do
 
 renamePhExpr :: PhExpr ParsedName -> Renamer (PhExpr Name)
 renamePhExpr phExpr =  do
-  traceRenamer $ "Renaming rest without registering: " <> (outputLazy . pretty $ phExpr)
+  traceRenamer $ "Renaming phExpr without registering: " <> (outputLazy . pretty $ phExpr)
   case phExpr of
     PhLit lit -> pure $ PhLit lit
     PhVar name -> PhVar <$> guardNotFound name
@@ -224,8 +225,12 @@ renamePhExpr phExpr =  do
               & Vector.fromList
       renamedCont <- addBindings names $ traverse renamePhExpr cont
       pure $ PhLet renamedBinds renamedCont
-    parsedExpr -> do
-      renamePhExpr parsedExpr
+    OpApp leftOperand operator rightOperand -> do
+      renamedLeftOperand <- traverse renamePhExpr leftOperand
+      renamedOperator <- traverse renamePhExpr operator
+      renamedRightOperand <- traverse renamePhExpr rightOperand
+      pure $ OpApp renamedLeftOperand renamedOperator renamedRightOperand
+    parsedExpr -> error $ "I don't know how to rename this expression: " <> TL.unpack (outputLazy . pretty $ parsedExpr)
 
 renameBinds :: PhLocalBinds ParsedName -> Renamer (PhLocalBinds Name)
 renameBinds (LocalBinds binds signatures) = do
@@ -325,21 +330,24 @@ renameTopLevelBinding (PatBind pat body) = do
 
 renamePhBindWithoutRegisteringName :: PhBind ParsedName -> Renamer (PhBind Name)
 renamePhBindWithoutRegisteringName (FunBind name matchGroup) = do
+  traceRenamer $ "Renaming FunBind without registering:" <> (outputLazy . pretty $ name)
   renamedName <- renameParsedNameWithoutRegistering name
   renamedMatchGroup <- renameMatchGroup matchGroup
   pure $
     FunBind renamedName renamedMatchGroup
 renamePhBindWithoutRegisteringName (PatBind pat body) = do
+  traceRenamer $ "Renaming PatBind without registering:" <> (outputLazy . pretty $ pat)
   renamedName <- traverse renamePatWithoutRegisteringName pat
   renamedBody <- traverse renameRHS body
   pure $ PatBind renamedName renamedBody
 
 guardNotFound :: ParsedName -> Renamer Name
 guardNotFound name = do
+  traceRenamer $ "throwing guardNotFound on: " <> (outputLazy . pretty $ name)
   RenamerContext{bindings} <- Reader.ask
   renamedName <- renameParsedNameWithoutRegistering name
   if bindingMember renamedName bindings
     then pure renamedName
     else do
-      printContext "_guard_not_found"
+      printContext "guard_not_found"
       Error.throwError $ BindingNotFound renamedName.occ.nameFS
