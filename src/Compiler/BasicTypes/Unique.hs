@@ -15,7 +15,8 @@ data Unique = Unique !UniqueSection !Int
 -- | Provenance of Uniques.
 data UniqueSection
   = -- PHC passes
-    ParseSection
+    SystemUnique
+  | ParseSection
   | RenameSection
   | TypeCheckSection
   | DesugarSection
@@ -42,6 +43,7 @@ nextUnique = do
   pure $ Unique section newUniqueInt
 
 instance Pretty UniqueSection where
+  pretty SystemUnique = "sys"
   pretty ParseSection = "p"
   pretty RenameSection = "rn"
   pretty TypeCheckSection = "tc"

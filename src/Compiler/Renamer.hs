@@ -15,11 +15,11 @@ module Compiler.Renamer
   ) where
 
 import Control.Monad
-import Data.Text.Lazy qualified as TL
 import Data.Foldable (traverse_)
 import Data.Function ((&))
 import Data.List qualified as List
 import Data.Maybe (fromJust, mapMaybe)
+import Data.Text.Lazy qualified as TL
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Effectful
@@ -41,26 +41,33 @@ import Compiler.Renamer.Types
 import Compiler.Renamer.Utils
 
 import Compiler.Settings (Settings)
+import Data.Map.Strict (Map)
+import Data.Set (Set)
 import Utils.MonadUtils
 import Utils.Output
 
 runRenamer
   :: Settings
+  -> (Set Name, Map Name (PhType Name))
   -> Renamer a
   -> IO (Either (CallStack, RenamerError) a)
-runRenamer settings action = do
+runRenamer settings (baseBindings, baseSignatures) action = do
   uniqueSupply <- mkUniqueSupply RenameSection
   action
     & Reader.runReader uniqueSupply
-    & Reader.runReader emptyRenamerContext
+    & Reader.runReader (RenamerContext baseBindings baseSignatures)
     & Reader.runReader settings
     & State.evalState emptyTopLevelContext
     & Error.runError
     & runEff
 
-rename :: Settings -> PhModule ParsedName -> IO (Either (CallStack, RenamerError) (PhModule Name))
-rename settings parsedModule = do
-  runRenamer settings $ do
+rename
+  :: Settings
+  -> (Set Name, Map Name (PhType Name))
+  -> PhModule ParsedName
+  -> IO (Either (CallStack, RenamerError) (PhModule Name))
+rename settings baseEnvironment parsedModule = do
+  runRenamer settings baseEnvironment $ do
     renamePhModule parsedModule
 
 -- Renaming ParsedName to Name --
@@ -142,11 +149,10 @@ ensureTopLevelSignatures decls = do
     )
     lol
   TopLevelBindings{topLevelBindings, topLevelSignatures} <- State.get
-  printContext "Top-level signatures"
   forM_
     topLevelBindings
     ( \name -> do
-        traceRenamer $ "Checking top-level binding" <> (outputLazy . pretty $ name)
+        traceRenamer $ "Checking top-level binding: " <> (outputLazy . pretty $ name)
         unless (signatureMember name topLevelSignatures) $
           Error.throwError $
             NoTopLevelSignature name.occ.nameFS
@@ -167,7 +173,7 @@ renamePhDecl (Binding bind) = do
   traceRenamer $ "Renaming binding: " <> (outputLazy . pretty $ bind)
   Binding <$> renamePhBindWithoutRegisteringName bind
 renamePhDecl (Signature sig) = do
-  traceRenamer $ "Renaming signature: " <> (outputLazy . pretty $ sig)
+  traceRenamer $ "Renaming signature declaration: " <> (outputLazy . pretty $ sig)
   renamedSignature <- renameTopLevelSigWithoutRegistering sig
   pure $ Signature renamedSignature
 renamePhDecl decl =
@@ -194,7 +200,7 @@ renamePatWithoutRegisteringName :: Pat ParsedName -> Renamer (Pat Name)
 renamePatWithoutRegisteringName (PVar name) = do
   traceRenamer $ "Renaming PVar without registering: " <> (outputLazy . pretty $ name)
   PVar <$> renameParsedNameWithoutRegistering name
-renamePatWithoutRegisteringName rest =  do
+renamePatWithoutRegisteringName rest = do
   traceRenamer $ "Renaming rest without registering: " <> (outputLazy . pretty $ rest)
   traverse renameParsedName rest
 
@@ -213,7 +219,7 @@ renameRHS rhs = do
   pure $ RHS renamedRhs renamedLocalBinds
 
 renamePhExpr :: PhExpr ParsedName -> Renamer (PhExpr Name)
-renamePhExpr phExpr =  do
+renamePhExpr phExpr = do
   traceRenamer $ "Renaming phExpr without registering: " <> (outputLazy . pretty $ phExpr)
   case phExpr of
     PhLit lit -> pure $ PhLit lit
@@ -253,7 +259,8 @@ guardForDuplicates groupedBinds = do
             let duplicateSpans = bindList & fmap getLoc & Vector.fromList
             throwError (DuplicateBinding duplicateName duplicateSpans)
           else pure bindList
-    ) groupedBinds
+    )
+    groupedBinds
 
 groupBindsByName :: [LPhBind ParsedName] -> [[LPhBind ParsedName]]
 groupBindsByName = List.groupBy (\a b -> (unLoc a).name == (unLoc b).name)
@@ -343,11 +350,13 @@ renamePhBindWithoutRegisteringName (PatBind pat body) = do
 
 guardNotFound :: ParsedName -> Renamer Name
 guardNotFound name = do
-  traceRenamer $ "throwing guardNotFound on: " <> (outputLazy . pretty $ name)
+  traceRenamer $ "Checking for existence: " <> (outputLazy . pretty $ name)
   RenamerContext{bindings} <- Reader.ask
   renamedName <- renameParsedNameWithoutRegistering name
   if bindingMember renamedName bindings
-    then pure renamedName
+    then do
+      traceRenamer $ (outputLazy . pretty $ renamedName) <> " exists. Proceeding."
+      pure renamedName
     else do
       printContext "guard_not_found"
       Error.throwError $ BindingNotFound renamedName.occ.nameFS

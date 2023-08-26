@@ -12,6 +12,7 @@ import PyF
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Compiler.BaseEnvironment
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.ParsedName
@@ -40,7 +41,9 @@ testRenameParsedName :: Assertion
 testRenameParsedName = do
   let srcSpan = mkUnhelpfulSrcSpan "<test>"
   let parsedName = mkUnQual varName srcSpan "putStrLn"
-  result <- assertRight =<< runRenamer defaultSettings (renameParsedName parsedName)
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
+  result <- assertRight =<< runRenamer defaultSettings baseEnvironment (renameParsedName parsedName)
   assertEqual "Wrong sort" result.sort Internal
   assertEqual "Wrong occurence name" result.occ (mkVarOccName srcSpan "putStrLn")
 
@@ -52,7 +55,9 @@ testRenamingUtils = do
           , occ = mkTcOccName noSrcSpan "bar"
           , uniq = Unique RenameSection 0
           }
-  Right result <- runRenamer defaultSettings $ do
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
+  Right result <- runRenamer defaultSettings baseEnvironment $ do
     addTopLevelBinding topLevelBinding1
     State.get @TopLevelBindings
   assertEqual
@@ -74,7 +79,7 @@ testRenamingUtils = do
             , uniq = Unique RenameSection 1
             }
 
-  intermediateResult <- runRenamer defaultSettings $ do
+  intermediateResult <- runRenamer defaultSettings baseEnvironment $ do
     addTopLevelSignature topLevelSignatureName1 topLevelSignatureType1
     State.get @TopLevelBindings
 
@@ -94,7 +99,9 @@ testEnsureTopLevelBindingsHaveASignature = do
     foo = 3
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  assertRenamerError (NoTopLevelSignature "foo") =<< rename defaultSettings parsedSnippet1
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
+  assertRenamerError (NoTopLevelSignature "foo") =<< rename defaultSettings baseEnvironment parsedSnippet1
 
 testDuplicateBindingsAreCaught :: Assertion
 testDuplicateBindingsAreCaught = do
@@ -109,6 +116,8 @@ testDuplicateBindingsAreCaught = do
        in 3
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
   assertRenamerError
     ( DuplicateBinding "x" $
         Vector.fromList
@@ -116,7 +125,7 @@ testDuplicateBindingsAreCaught = do
           , RealSrcSpan $ mkRealSrcSpan (mkRealSrcLoc "<snippet1>" 7 11) (mkRealSrcLoc "<snippet1>" 7 20)
           ]
     )
-    =<< rename defaultSettings parsedSnippet1
+    =<< rename defaultSettings baseEnvironment parsedSnippet1
 
 testBindingsWithSameNameInDifferentBranches :: Assertion
 testBindingsWithSameNameInDifferentBranches = do
@@ -135,4 +144,6 @@ testBindingsWithSameNameInDifferentBranches = do
        in x
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  void $ assertRight =<< rename defaultSettings parsedSnippet1
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
+  void $ assertRight =<< rename defaultSettings baseEnvironment parsedSnippet1

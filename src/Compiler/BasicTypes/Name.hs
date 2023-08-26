@@ -14,17 +14,19 @@ module Compiler.BasicTypes.Name
   , isSystemName
   , mkTypeName
   , mkTermName
+  , mkSystemName
+  , mkSystemTypeName
   ) where
 
 import Compiler.BasicTypes.OccName
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 import Data.Text
+import Data.Vector (Vector)
+import Data.Vector qualified as Vector
 import Effectful
 import Effectful.Reader.Static (Reader)
 import Prettyprinter
-import Data.Vector (Vector)
-import Data.Vector qualified as Vector
 
 -- | A 'Name' identifies an entity.
 -- It appears in the AST after the Renamer has turned all 'ParsedName's
@@ -55,7 +57,7 @@ instance Pretty NameSort where
   pretty System = "system"
 
 instance HasSrcSpan Name where
-  srcSpanOf name = srcSpanOf $ name.occ
+  srcSpanOf name = srcSpanOf name.occ
 
 instance HasOccName Name where
   occNameOf name = name.occ
@@ -67,19 +69,19 @@ nameSrcSpan :: Name -> SrcSpan
 nameSrcSpan name = name.occ.occNameSrcSpan
 
 isTyVarName :: Name -> Bool
-isTyVarName name = isTyVarOccName $ name.occ
+isTyVarName name = isTyVarOccName name.occ
 
 isTyConName :: Name -> Bool
-isTyConName name = isTcClsOccName $ name.occ
+isTyConName name = isTcClsOccName name.occ
 
 isDataConName :: Name -> Bool
-isDataConName name = isDataConOccName $ name.occ
+isDataConName name = isDataConOccName name.occ
 
 isValName :: Name -> Bool
-isValName name = isValOccName $ name.occ
+isValName name = isValOccName name.occ
 
 isVarName :: Name -> Bool
-isVarName name = isVarOccName $ name.occ
+isVarName name = isVarOccName name.occ
 
 isSystemName :: Name -> Bool
 isSystemName Name{sort = System} = True
@@ -99,6 +101,20 @@ mkTypeName fsName = do
   uniq <- nextUnique
   pure $ Name{..}
 
+mkSystemTypeName :: (Reader UniqueSupply :> es, IOE :> es) => Text -> Eff es Name
+mkSystemTypeName fsName = do
+  let occ = mkTcOccName (UnhelpfulSpan "") fsName
+  let sort = System
+  uniq <- nextUnique
+  pure $ Name{..}
+
+mkSystemName :: (Reader UniqueSupply :> es, IOE :> es) => Text -> Eff es Name
+mkSystemName name = do
+  let occ = mkTcOccName (UnhelpfulSpan "") name
+  let sort = System
+  uniq <- nextUnique
+  pure $ Name{..}
+
 instance Pretty Name where
   pretty Name{occ} = pretty occ
 
@@ -110,4 +126,3 @@ intercalateVec separator vector =
   if Vector.null vector
     then vector
     else Vector.tail $ Vector.concatMap (\word -> Vector.fromList [separator, word]) vector
-

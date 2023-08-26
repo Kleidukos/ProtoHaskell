@@ -22,10 +22,10 @@ import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
 import Compiler.PhSyn.PhType
 import Compiler.Renamer.Types
+import Debug.Trace
 import Prettyprinter
 import Text.Pretty.Simple
 import Utils.Output
-import Debug.Trace
 
 addBinding :: Name -> Renamer a -> Renamer a
 addBinding name action = do

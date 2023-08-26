@@ -12,6 +12,7 @@ module Compiler.Settings
   , Settings (..)
   , defaultSettings
   , setRenamerTracing
+  , setTypecheckerTracing
 
     -- * Querying Flags
   , warnOpt
@@ -67,6 +68,7 @@ data DumpFlag
 -- "unspecified" may mean Auto, rather than Never.
 data GeneralFlag
   = TraceRenamer
+  | TraceTypechecker
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 data Settings = Settings
@@ -92,6 +94,11 @@ defaultSettings =
 setRenamerTracing :: Settings -> Settings
 setRenamerTracing settings =
   let newGeneralFlags = Set.insert TraceRenamer settings.generalFlags
+   in settings{generalFlags = newGeneralFlags}
+
+setTypecheckerTracing :: Settings -> Settings
+setTypecheckerTracing settings =
+  let newGeneralFlags = Set.insert TraceTypechecker settings.generalFlags
    in settings{generalFlags = newGeneralFlags}
 
 warnOpt :: WarnFlag -> Settings -> Bool

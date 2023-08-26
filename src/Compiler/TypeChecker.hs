@@ -5,15 +5,16 @@ import Data.Map.Strict qualified as Map
 
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
+import Compiler.BasicTypes.SrcLoc (unLoc)
 import Compiler.BasicTypes.Unique
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhType
-import Effectful
-import Effectful.Error.Static (Error)
+import Compiler.Settings (Settings)
 
-import Compiler.BasicTypes.SrcLoc (unLoc)
 import Control.Monad (void)
 import Data.Function ((&))
+import Effectful
+import Effectful.Error.Static (Error)
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static (Reader)
 import Effectful.Reader.Static qualified as Reader
@@ -23,6 +24,7 @@ import Effectful.State.Static.Local qualified as State
 type TypeChecker =
   Eff
     [ Reader UniqueSupply
+    , Reader Settings
     , State Environment
     , Error TypeCheckingError
     , IOE
@@ -49,26 +51,30 @@ data TypeCheckingError
   | OtherTypeError
   deriving stock (Eq, Ord, Show)
 
-runTypeChecker :: Environment -> TypeChecker a -> IO (Either TypeCheckingError a)
-runTypeChecker env action = do
+runTypeChecker :: Environment -> Settings -> TypeChecker a -> IO (Either TypeCheckingError a)
+runTypeChecker env settings action = do
   uniqueSupply <- mkUniqueSupply TypeCheckSection
   action
     & Reader.runReader uniqueSupply
+    & Reader.runReader settings
     & State.evalState env
     & Error.runErrorNoCallStack
     & runEff
 
-inferType :: PhExpr Name -> TypeChecker TypedExpr
-inferType = \case
-  PhVar name -> do
-    lookedUpType <- lookupTypeOfName name
-    pure $ TypedExpr lookedUpType (PhVar name)
-  PhLit lit -> do
-    synthesisedType <- synthLiteral lit
-    pure $ TypedExpr synthesisedType (PhLit lit)
-  Typed exprType expression -> do
-    checkType (unLoc exprType) (unLoc expression)
-  e -> error $ "Did not implement inference for" <> show e
+inferType :: PhDecl Name -> TypeChecker (PhDecl Name)
+
+inferType' :: PhExpr Name -> TypeChecker TypedExpr
+inferType' phExpr = do
+  case phExpr of
+    PhVar name -> do
+      lookedUpType <- lookupTypeOfName name
+      pure $ TypedExpr lookedUpType (PhVar name)
+    PhLit lit -> do
+      synthesisedType <- synthLiteral lit
+      pure $ TypedExpr synthesisedType (PhLit lit)
+    Typed exprType expression -> do
+      checkType (unLoc exprType) (unLoc expression)
+    e -> error $ "Did not implement inference for" <> show e
 
 -- | Lookup the type of a term
 lookupTypeOfName :: Name -> TypeChecker (PhType Name)
@@ -80,10 +86,10 @@ lookupTypeOfName name = do
         _ -> Error.throwError TypeNotFound
 
 synthLiteral :: PhLit -> TypeChecker (PhType Name)
-synthLiteral (LitInt _i) = mkTypeName "Int" >>= mkType
-synthLiteral (LitFloat _f) = mkTypeName "Float" >>= mkType
-synthLiteral (LitChar _c) = mkTypeName "Char" >>= mkType
-synthLiteral (LitString _s) = mkTypeName "String" >>= mkType
+synthLiteral (LitInt _i) = mkSystemTypeName "Int" >>= mkType
+synthLiteral (LitFloat _f) = mkSystemTypeName "Float" >>= mkType
+synthLiteral (LitChar _c) = mkSystemTypeName "Char" >>= mkType
+synthLiteral (LitString _s) = mkSystemTypeName "String" >>= mkType
 
 mkType :: Name -> TypeChecker (PhType Name)
 mkType name = pure $ PhVarTy name

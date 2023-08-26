@@ -4,22 +4,25 @@
 module Compiler.TypeCheckerTest where
 
 import Data.Map.Strict qualified as Map
+import Control.Monad
+import PyF
+import Test
 import Test.Tasty
 import Test.Tasty.HUnit
+import Text.Pretty.Simple
 
+import Compiler.BaseEnvironment
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName hiding (varName)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 import Compiler.Parser.Parser (parse)
 import Compiler.PhSyn.PhExpr
+import Compiler.PhSyn.PhSyn
 import Compiler.PhSyn.PhType
 import Compiler.Renamer
-import Compiler.Settings (defaultSettings, setRenamerTracing)
+import Compiler.Settings
 import Compiler.TypeChecker
-import PyF
-import Test
-import Text.Pretty.Simple
 
 spec :: TestTree
 spec =
@@ -62,6 +65,7 @@ testTypeSynthesisOnStringLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
+        (setTypecheckerTracing defaultSettings)
         (inferType literal)
   assertEqual
     "Correct type inferred for String"
@@ -87,6 +91,7 @@ testTypeSynthesisOnCharLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
+        (setTypecheckerTracing defaultSettings)
         (inferType literal)
   assertEqual
     "Correct type inferred for Char"
@@ -112,6 +117,7 @@ testTypeSynthesisOnIntLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
+        (setTypecheckerTracing defaultSettings)
         (inferType literal)
   assertEqual
     "Correct type inferred for Int"
@@ -137,6 +143,7 @@ testTypeSynthesisOnFloatLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
+        (setTypecheckerTracing defaultSettings)
         (inferType literal)
   assertEqual
     "Correct type inferred for Float"
@@ -175,6 +182,7 @@ testLookupVar = do
     assertRight
       =<< runTypeChecker
         environment
+        (setTypecheckerTracing defaultSettings)
         (inferType var)
   assertEqual
     "Correct type inferred for myVar :: Float"
@@ -215,6 +223,7 @@ testAnnotatedExpr = do
     assertRight
       =<< runTypeChecker
         environment
+        (setTypecheckerTracing defaultSettings)
         (inferType var)
   assertEqual
     "Correct type inferred for myOtherVar :: Int"
@@ -227,8 +236,23 @@ testAddition = do
         [str|
   module Snippet1 where
 
+    bar :: Int -> Int -> Int
     bar = 3 + 2
   |]
   parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
-  renamed <- assertRight =<< rename (setRenamerTracing defaultSettings) parsedSnippet1
-  print renamed
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
+  renamed <-
+    assertRight
+      =<< rename
+        (defaultSettings)
+        baseEnvironment
+        parsedSnippet1
+  pPrint renamed
+  
+  -- void $
+  --   assertRight
+  --     =<< runTypeChecker
+  --       emptyTypeCheckerEnvironment
+  --       (setTypecheckerTracing defaultSettings)
+  --       (traverse inferType (fmap unLoc renamed.modDecls))
