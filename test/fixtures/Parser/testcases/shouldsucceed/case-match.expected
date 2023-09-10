@@ -1,0 +1,137 @@
+Module
+  { modName = Nothing
+  , modDecls =
+    [ Located
+      ( RealSrcSpan SrcSpanMultiLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 1 1 4 19 )
+      ( Binding
+        ( PatBind
+          ( Located
+            ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 1 1 5 )
+            ( PVar
+              ( UnQual
+                ( OccName
+                  { nameSpace = VarName
+                  , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 1 1 5
+                  , nameFS = main
+                  }
+                )
+              )
+            )
+          )
+          ( Located
+            ( RealSrcSpan SrcSpanMultiLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 1 6 4 19 )
+            ( RHS
+              { expr = Located
+                ( RealSrcSpan SrcSpanMultiLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 2 3 4 19 )
+                ( PhCase
+                  ( Located
+                    ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 2 8 12 )
+                    ( PhVar
+                      ( UnQual
+                        ( OccName
+                          { nameSpace = VarName
+                          , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 2 8 12
+                          , nameFS = blah
+                          }
+                        )
+                      )
+                    )
+                  )
+                  ( MG
+                    { alternatives =
+                      [ Located
+                        ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 3 5 22 )
+                        ( Match
+                          { matchPats =
+                            [ Located
+                              ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 3 5 13 )
+                              ( PCon
+                                ( UnQual
+                                  ( OccName
+                                    { nameSpace = DataName
+                                    , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 3 5 9
+                                    , nameFS = Left
+                                    }
+                                  )
+                                )
+                                [ PVar
+                                  ( UnQual
+                                    ( OccName
+                                      { nameSpace = VarName
+                                      , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 3 10 13
+                                      , nameFS = foo
+                                      }
+                                    )
+                                  )
+                                ]
+                              )
+                            ]
+                          , rhs = Located
+                            ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 3 14 22 )
+                            ( RHS
+                              { expr = Located
+                                ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 3 17 22 )
+                                ( PhLit
+                                  ( LitString "bar" )
+                                )
+                              , localBinds = Located ( UnhelpfulSpan <no location info> )
+                                ( LocalBinds [] [] )
+                              }
+                            )
+                          }
+                        )
+                      , Located
+                        ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 4 5 19 )
+                        ( Match
+                          { matchPats =
+                            [ Located
+                              ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 4 5 14 )
+                              ( PCon
+                                ( UnQual
+                                  ( OccName
+                                    { nameSpace = DataName
+                                    , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 4 5 10
+                                    , nameFS = Right
+                                    }
+                                  )
+                                )
+                                [ PVar
+                                  ( UnQual
+                                    ( OccName
+                                      { nameSpace = VarName
+                                      , occNameSrcSpan = RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 4 11 14
+                                      , nameFS = baz
+                                      }
+                                    )
+                                  )
+                                ]
+                              )
+                            ]
+                          , rhs = Located
+                            ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 4 15 19 )
+                            ( RHS
+                              { expr = Located
+                                ( RealSrcSpan SrcSpanOneLine test/fixtures/Parser/testcases/shouldsucceed/case-match.hs 4 18 19 )
+                                ( PhLit
+                                  ( LitInt 3 )
+                                )
+                              , localBinds = Located ( UnhelpfulSpan <no location info> )
+                                ( LocalBinds [] [] )
+                              }
+                            )
+                          }
+                        )
+                      ]
+                    , context = CaseCtxt
+                    }
+                  )
+                )
+              , localBinds = Located ( UnhelpfulSpan <no location info> )
+                ( LocalBinds [] [] )
+              }
+            )
+          )
+        )
+      )
+    ]
+  }

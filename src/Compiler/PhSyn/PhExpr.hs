@@ -5,6 +5,7 @@ import Data.Text (Text)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.PhSyn.PhType
 
+import Compiler.BasicTypes.Name
 import GHC.Records
 import Prettyprinter
 import Utils.Output
@@ -33,7 +34,10 @@ data PhExpr name
   | ExplicitList [LPhExpr name]
   | ArithSeq (ArithSeqInfo name)
   | Typed (LPhType name) (LPhExpr name)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+data TypedExpr = TypedExpr (PhType Name) (PhExpr Name)
+  deriving stock (Eq, Ord, Show)
 
 mkLPhAppExpr :: LPhExpr name -> LPhExpr name -> LPhExpr name
 mkLPhAppExpr e1@(Located s1 _) e2@(Located s2 _) =
@@ -44,20 +48,20 @@ data PhLit
   | LitFloat Double
   | LitChar Char
   | LitString Text
-  deriving (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show)
 
 data MatchGroup name = MG
   { alternatives :: [LMatch name]
   , context :: MatchContext
   }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LMatch name = Located (Match name)
 data Match name = Match
   { matchPats :: [LPat name]
   , rhs :: LRHS name
   }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LRHS name = Located (RHS name)
 data RHS name = RHS
@@ -68,7 +72,7 @@ data RHS name = RHS
   -- So the pretty-printer won't print them. Messages printed from source would
   -- still (obviously) see the empty local bindings.
   }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 {- NOTE: [GRHS]
 Called "guarded right hand sides" even if there are actually no guards
@@ -85,14 +89,14 @@ a GRHS uniformly later.
 -- by the context). Then RHS contains a [LGRHS] instead of just an LGRHS.
 type LGuard name = Located (Guard name)
 data Guard name = Guard (LPhExpr name) (LPhExpr name)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data MatchContext
   = FunCtxt
   | CaseCtxt
   | LamCtxt
   | LetCtxt
-  deriving (Eq, Ord, Show, Enum, Bounded)
+  deriving stock (Eq, Ord, Show, Enum, Bounded)
 
 isCaseOrLamCtxt :: MatchContext -> Bool
 isCaseOrLamCtxt CaseCtxt = True
@@ -111,11 +115,11 @@ data Pat name
   | PTuple [Pat name]
   | PLit PhLit
   | PWildCard
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LPhLocalBinds name = Located (PhLocalBinds name)
 data PhLocalBinds name = LocalBinds [LPhBind name] [LSig name]
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 type LPhBind name = Located (PhBind name)
 data PhBind name
@@ -124,7 +128,7 @@ data PhBind name
   | -- | let Just x = …
     -- or foo = 3
     PatBind (LPat name) (LRHS name)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance HasField "name" (PhBind name) (Maybe name) where
   getField (FunBind name _) = Just name
@@ -148,7 +152,7 @@ data Stmt name
 
     -- | let bindings
     SLet (LPhLocalBinds name)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- This will become more interesting if we implement TupleSections
 type LPhTupArg name = LPhExpr name
@@ -165,7 +169,7 @@ data ArithSeqInfo name
       (LPhExpr name)
       (LPhExpr name)
       (LPhExpr name)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 {- NOTE: [Par constructors in syn]
 
@@ -182,12 +186,12 @@ we simply ensure that we generate the correct PhPar wrappers.
 type LSig name = Located (Sig name)
 data Sig name
   = TypeSig name (LPhType name)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance HasField "name" (Sig name) name where
   getField (TypeSig name _) = name
 
-data Assoc = Infix | InfixL | InfixR deriving (Eq, Ord, Show, Enum, Bounded)
+data Assoc = Infix | InfixL | InfixR deriving stock (Eq, Ord, Show, Enum, Bounded)
 
 ----------------------------------------------------------------------------------
 -- Pretty instances

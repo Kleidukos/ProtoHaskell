@@ -49,6 +49,7 @@ library
 
   -- cabal-fmt: expand src/
   exposed-modules:
+    Compiler.BaseEnvironment
     Compiler.BasicTypes.FastString
     Compiler.BasicTypes.Location
     Compiler.BasicTypes.Name
@@ -72,6 +73,7 @@ library
     Compiler.Renamer.Utils
     Compiler.Settings
     Compiler.TypeChecker
+    Compiler.TypeChecker.Utils
     Utils.MonadUtils
     Utils.Output
 

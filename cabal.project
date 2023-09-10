@@ -1,4 +1,5 @@
 packages: ./
-with-compiler: ghc-9.4.5
+with-compiler: ghc-9.4.6
 tests: True
 test-show-details: direct
+profiling: True

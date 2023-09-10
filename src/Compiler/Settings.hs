@@ -9,24 +9,30 @@ module Compiler.Settings
   , LangFlag (..)
   , DumpFlag (..)
   , GeneralFlag (..)
-  , Settings -- abstract
+  , Settings (..)
   , defaultSettings
+  , setRenamerTracing
+  , setTypecheckerTracing
 
     -- * Querying Flags
   , warnOpt
-  , langOpt
   , dumpOpt
   , gOpt
   , shouldUseColor
-
-    -- * Obtaining flags from structures
-  , HasSettings (..)
-  , ContainsSettings (..)
   ) where
 
 -- NOTE: perhaps we should be using 'EnumSet's?
 import Data.Set (Set)
 import Data.Set qualified as Set
+
+data OverridingBool = Auto | Always | Never
+  deriving (Eq, Ord, Show, Enum, Bounded)
+
+overrideWith :: Bool -> OverridingBool -> Bool
+overrideWith b Auto = b
+overrideWith _ Always = True
+overrideWith _ Never = False
+infixr 4 `overrideWith` -- binds tighter than && and ||
 
 -- | Flags that start with -W
 data WarnFlag
@@ -61,12 +67,12 @@ data DumpFlag
 -- own field in the 'Settings' record, because
 -- "unspecified" may mean Auto, rather than Never.
 data GeneralFlag
-  = FPprDebug
+  = TraceRenamer
+  | TraceTypechecker
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 data Settings = Settings
   { warningFlags :: Set WarnFlag
-  , languageFlags :: Set LangFlag
   , dumpFlags :: Set DumpFlag
   , generalFlags :: Set GeneralFlag
   , canUseColor :: Bool
@@ -78,7 +84,6 @@ defaultSettings :: Settings
 defaultSettings =
   Settings
     { warningFlags = Set.empty
-    , languageFlags = Set.empty
     , dumpFlags = Set.empty
     , generalFlags = Set.empty
     , -- needs to be initialized in IO by checking if stderr supports colors
@@ -86,11 +91,18 @@ defaultSettings =
     , useColor = Auto
     }
 
+setRenamerTracing :: Settings -> Settings
+setRenamerTracing settings =
+  let newGeneralFlags = Set.insert TraceRenamer settings.generalFlags
+   in settings{generalFlags = newGeneralFlags}
+
+setTypecheckerTracing :: Settings -> Settings
+setTypecheckerTracing settings =
+  let newGeneralFlags = Set.insert TraceTypechecker settings.generalFlags
+   in settings{generalFlags = newGeneralFlags}
+
 warnOpt :: WarnFlag -> Settings -> Bool
 warnOpt wf s = wf `Set.member` warningFlags s
-
-langOpt :: LangFlag -> Settings -> Bool
-langOpt xf s = xf `Set.member` languageFlags s
 
 dumpOpt :: DumpFlag -> Settings -> Bool
 dumpOpt df s = df `Set.member` dumpFlags s
@@ -100,20 +112,3 @@ gOpt gf s = gf `Set.member` generalFlags s
 
 shouldUseColor :: Settings -> Bool
 shouldUseColor stngs = canUseColor stngs `overrideWith` useColor stngs
-
--- We intend to make monads instances of this class...
-class HasSettings m where
-  getSettings :: m Settings
-
--- ... and non-monads instances of this class.
-class ContainsSettings a where
-  extractSettings :: a -> Settings
-
-data OverridingBool = Auto | Always | Never
-  deriving (Eq, Ord, Show, Enum, Bounded)
-
-overrideWith :: Bool -> OverridingBool -> Bool
-overrideWith b Auto = b
-overrideWith _ Always = True
-overrideWith _ Never = False
-infixr 4 `overrideWith` -- binds tighter than && and ||

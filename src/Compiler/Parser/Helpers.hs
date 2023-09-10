@@ -46,7 +46,7 @@ import Text.Parsec hiding
 import Text.Parsec qualified as Parsec
 import Text.Parsec.Pos (newPos)
 
-import Text.Parsec.Language (GenLanguageDef (..))
+import Text.Parsec.Language (GenLanguageDef)
 import Text.Parsec.Token (GenTokenParser)
 import Text.Parsec.Token qualified as PT
 
@@ -62,7 +62,7 @@ data ParseState = ParseState
   , layoutContexts :: [LayoutContext]
   , endOfPrevToken :: SrcLoc
   }
-  deriving (Show)
+  deriving stock (Show)
 
 data IndentOrdering = Eq | Gt | Geq deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
@@ -71,6 +71,7 @@ data LayoutContext
   | Implicit Int
   deriving (Eq, Ord, Show)
 
+initParseState :: Settings -> ParseState
 initParseState flags = ParseState flags Eq [] noSrcLoc
 
 pushLayoutContext :: LayoutContext -> Parser ()
@@ -132,9 +133,6 @@ anticipate t msg = do
 
 anticipateOp :: String -> String -> Parser a
 anticipateOp op = anticipate (reservedOpToTok op)
-
-instance HasSettings (Parsec [Lexeme] ParseState) where
-  getSettings = compFlags <$> getState
 
 {- NOTE: [Overlapping Show instance for Lexeme]
 

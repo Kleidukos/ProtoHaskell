@@ -5,14 +5,16 @@ import Data.Map.Strict qualified as Map
 
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName
+import Compiler.BasicTypes.SrcLoc (unLoc)
 import Compiler.BasicTypes.Unique
 import Compiler.PhSyn.PhExpr
 import Compiler.PhSyn.PhType
+import Compiler.Settings (Settings)
+
+import Control.Monad (void)
+import Data.Function ((&))
 import Effectful
 import Effectful.Error.Static (Error)
-
-import Compiler.BasicTypes.SrcLoc (unLoc)
-import Data.Function ((&))
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static (Reader)
 import Effectful.Reader.Static qualified as Reader
@@ -22,6 +24,7 @@ import Effectful.State.Static.Local qualified as State
 type TypeChecker =
   Eff
     [ Reader UniqueSupply
+    , Reader Settings
     , State Environment
     , Error TypeCheckingError
     , IOE
@@ -48,44 +51,91 @@ data TypeCheckingError
   | OtherTypeError
   deriving stock (Eq, Ord, Show)
 
-runTypeChecker :: Environment -> TypeChecker a -> IO (Either TypeCheckingError a)
-runTypeChecker env action = do
+runTypeChecker :: Environment -> Settings -> TypeChecker a -> IO (Either TypeCheckingError a)
+runTypeChecker env settings action = do
   uniqueSupply <- mkUniqueSupply TypeCheckSection
   action
     & Reader.runReader uniqueSupply
+    & Reader.runReader settings
     & State.evalState env
     & Error.runErrorNoCallStack
     & runEff
 
-inferType :: PhExpr Name -> TypeChecker (PhType Name)
-inferType = \case
-  PhVar name -> lookupType name
-  PhLit lit -> synthLiteral lit
-  Typed exprType expression -> checkType (unLoc expression) (unLoc exprType)
+inferType :: PhDecl Name -> TypeChecker (PhDecl Name)
+inferType decl =
+  case decl of
+    Binding phBind 
+
+
+inferType' :: PhExpr Name -> TypeChecker TypedExpr
+inferType' phExpr = do
+  case phExpr of
+    PhVar name -> do
+      lookedUpType <- lookupTypeOfName name
+      pure $ TypedExpr lookedUpType (PhVar name)
+    PhLit lit -> do
+      synthesisedType <- synthLiteral lit
+      pure $ TypedExpr synthesisedType (PhLit lit)
+    Typed exprType expression -> do
+      checkType (unLoc exprType) (unLoc expression)
+    e -> error $ "Did not implement inference for" <> show e
 
 -- | Lookup the type of a term
-lookupType :: Name -> TypeChecker (PhType Name)
-lookupType name = do
+lookupTypeOfName :: Name -> TypeChecker (PhType Name)
+lookupTypeOfName name = do
   Environment{types} <- State.get
-  let result = Map.elems $ Map.filterWithKey (\tyName _ -> tyName.occ.nameFS == name.occ.nameFS) types
+  let result =
+        Map.elems $
+          Map.filterWithKey (\tyName _ -> tyName.occ.nameFS == name.occ.nameFS) types
    in case result of
         [associatedType] -> pure associatedType
         _ -> Error.throwError TypeNotFound
 
 synthLiteral :: PhLit -> TypeChecker (PhType Name)
-synthLiteral (LitInt _i) = mkTypeName "Int" >>= mkType
-synthLiteral (LitFloat _f) = mkTypeName "Float" >>= mkType
-synthLiteral (LitChar _c) = mkTypeName "Char" >>= mkType
-synthLiteral (LitString _s) = mkTypeName "String" >>= mkType
+synthLiteral (LitInt _i) = mkSystemTypeName "Int" >>= mkType
+synthLiteral (LitFloat _f) = mkSystemTypeName "Float" >>= mkType
+synthLiteral (LitChar _c) = mkSystemTypeName "Char" >>= mkType
+synthLiteral (LitString _s) = mkSystemTypeName "String" >>= mkType
 
 mkType :: Name -> TypeChecker (PhType Name)
 mkType name = pure $ PhVarTy name
 
 --- Checking
 
-checkType :: PhExpr Name -> PhType Name -> TypeChecker (PhType Name)
-checkType term typeToCheck = do
-  foundType <- inferType term
-  if typeToCheck == foundType
-    then pure typeToCheck
-    else Error.throwError $ TypeMismatch typeToCheck foundType
+compareType
+  :: PhType Name
+  -- ^ Type to check
+  -> PhType Name
+  -- ^ Type in the environment
+  -> TypeChecker (PhType Name)
+compareType typeToCheck typeFromEnv
+  | typeToCheck == typeFromEnv = pure typeToCheck
+  | otherwise = Error.throwError $ TypeMismatch typeToCheck typeFromEnv
+
+checkType :: PhType Name -> PhExpr Name -> TypeChecker TypedExpr
+checkType typeToCheck expr =
+  case expr of
+    PhVar name -> do
+      (TypedExpr actualType expr') <- inferType (PhVar name)
+      void $ compareType typeToCheck actualType
+      pure $ TypedExpr actualType expr'
+    _ -> error $ "Type checking not implement for " <> show expr
+
+checkMatchGroup :: PhType Name -> MatchGroup Name -> TypeChecker TypedExpr
+checkMatchGroup typeToCheck mg = undefined
+
+--
+-- checkMatch :: PhType Name -> Match Name -> TypeChecker (Match Name)
+-- checkMatch typeToCheck (Match pats body) =
+--   case typeToCheck of
+--     PhFunTy ty1 ty2 ->
+--
+checkPat :: PhType Name -> Pat Name -> TypeChecker (Pat Name)
+checkPat typeToCheck pat =
+  case pat of
+    PWildCard -> pure pat
+    PLit lit -> do
+      typeFromEnv <- synthLiteral lit
+      void $ compareType typeToCheck typeFromEnv
+      pure pat
+    PCon constructorName parameters -> undefined

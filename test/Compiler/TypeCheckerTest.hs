@@ -1,17 +1,28 @@
+{-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Compiler.TypeCheckerTest where
 
+import Control.Monad
 import Data.Map.Strict qualified as Map
+import PyF
+import Test
 import Test.Tasty
 import Test.Tasty.HUnit
+import Text.Pretty.Simple
 
+import Compiler.BaseEnvironment
 import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.OccName hiding (varName)
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
+import Compiler.Parser.Parser (parse)
 import Compiler.PhSyn.PhExpr
+import Compiler.PhSyn.PhSyn
 import Compiler.PhSyn.PhType
+import Compiler.Renamer
+import Compiler.Settings
 import Compiler.TypeChecker
-import Test
 
 spec :: TestTree
 spec =
@@ -25,15 +36,19 @@ spec =
         , testCase "Float" testTypeSynthesisOnFloatLiteral
         ]
     , testGroup
-        "Type checking"
+        "Basic type checking"
         [ testCase "Var lookup" testLookupVar
         , testCase "Expression with type annotation" testAnnotatedExpr
+        ]
+    , testGroup
+        "Numeric operations"
+        [ testCase "Addition" testAddition
         ]
     ]
 
 testTypeSynthesisOnStringLiteral :: Assertion
 testTypeSynthesisOnStringLiteral = do
-  let stringLiteral = PhLit (LitString "Parser Golden Tests")
+  let literal = PhLit (LitString "Parser Golden Tests")
   let expectedType =
         PhVarTy $
           Name
@@ -50,15 +65,16 @@ testTypeSynthesisOnStringLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
-        (inferType stringLiteral)
+        (setTypecheckerTracing defaultSettings)
+        (inferType literal)
   assertEqual
     "Correct type inferred for String"
+    (TypedExpr expectedType literal)
     result
-    expectedType
 
 testTypeSynthesisOnCharLiteral :: Assertion
 testTypeSynthesisOnCharLiteral = do
-  let stringLiteral = PhLit (LitChar 'c')
+  let literal = PhLit (LitChar 'c')
   let expectedType =
         PhVarTy $
           Name
@@ -75,15 +91,16 @@ testTypeSynthesisOnCharLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
-        (inferType stringLiteral)
+        (setTypecheckerTracing defaultSettings)
+        (inferType literal)
   assertEqual
     "Correct type inferred for Char"
+    (TypedExpr expectedType literal)
     result
-    expectedType
 
 testTypeSynthesisOnIntLiteral :: Assertion
 testTypeSynthesisOnIntLiteral = do
-  let stringLiteral = PhLit (LitInt 3)
+  let literal = PhLit (LitInt 3)
   let expectedType =
         PhVarTy $
           Name
@@ -100,15 +117,16 @@ testTypeSynthesisOnIntLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
-        (inferType stringLiteral)
+        (setTypecheckerTracing defaultSettings)
+        (inferType literal)
   assertEqual
     "Correct type inferred for Int"
+    (TypedExpr expectedType literal)
     result
-    expectedType
 
 testTypeSynthesisOnFloatLiteral :: Assertion
 testTypeSynthesisOnFloatLiteral = do
-  let stringLiteral = PhLit (LitFloat 3.2)
+  let literal = PhLit (LitFloat 3.2)
   let expectedType =
         PhVarTy $
           Name
@@ -125,11 +143,12 @@ testTypeSynthesisOnFloatLiteral = do
     assertRight
       =<< runTypeChecker
         emptyTypeCheckerEnvironment
-        (inferType stringLiteral)
+        (setTypecheckerTracing defaultSettings)
+        (inferType literal)
   assertEqual
     "Correct type inferred for Float"
     result
-    expectedType
+    (TypedExpr expectedType literal)
 
 testLookupVar :: Assertion
 testLookupVar = do
@@ -163,11 +182,12 @@ testLookupVar = do
     assertRight
       =<< runTypeChecker
         environment
+        (setTypecheckerTracing defaultSettings)
         (inferType var)
   assertEqual
     "Correct type inferred for myVar :: Float"
+    (TypedExpr expectedType var)
     result
-    expectedType
 
 testAnnotatedExpr :: Assertion
 testAnnotatedExpr = do
@@ -203,8 +223,36 @@ testAnnotatedExpr = do
     assertRight
       =<< runTypeChecker
         environment
+        (setTypecheckerTracing defaultSettings)
         (inferType var)
   assertEqual
     "Correct type inferred for myOtherVar :: Int"
+    (TypedExpr expectedType (PhVar varName))
     result
-    expectedType
+
+testAddition :: Assertion
+testAddition = do
+  let snippet1 =
+        [str|
+  module Snippet1 where
+
+    bar :: Int -> Int -> Int
+    bar = 3 + 2
+  |]
+  parsedSnippet1 <- assertRight $ parse "<snippet1>" defaultSettings snippet1
+  baseSupply <- mkUniqueSupply SystemUnique
+  baseEnvironment <- getBaseEnvironment baseSupply
+  renamed <-
+    assertRight
+      =<< rename
+        (defaultSettings)
+        baseEnvironment
+        parsedSnippet1
+  pPrint renamed
+
+-- void $
+--   assertRight
+--     =<< runTypeChecker
+--       emptyTypeCheckerEnvironment
+--       (setTypecheckerTracing defaultSettings)
+--       (traverse inferType (fmap unLoc renamed.modDecls))

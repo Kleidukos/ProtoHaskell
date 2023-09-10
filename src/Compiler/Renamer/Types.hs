@@ -14,6 +14,7 @@ import Compiler.BasicTypes.Name
 import Compiler.BasicTypes.SrcLoc
 import Compiler.BasicTypes.Unique
 import Compiler.PhSyn.PhType
+import Compiler.Settings
 import Data.Vector (Vector)
 
 data RenamerError
@@ -53,6 +54,7 @@ type Renamer a =
   Eff
     [ Reader UniqueSupply
     , Reader RenamerContext
+    , Reader Settings
     , State TopLevelBindings
     , Error RenamerError
     , IOE
