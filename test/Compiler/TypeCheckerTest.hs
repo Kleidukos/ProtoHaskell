@@ -3,8 +3,8 @@
 
 module Compiler.TypeCheckerTest where
 
-import Data.Map.Strict qualified as Map
 import Control.Monad
+import Data.Map.Strict qualified as Map
 import PyF
 import Test
 import Test.Tasty
@@ -249,10 +249,10 @@ testAddition = do
         baseEnvironment
         parsedSnippet1
   pPrint renamed
-  
-  -- void $
-  --   assertRight
-  --     =<< runTypeChecker
-  --       emptyTypeCheckerEnvironment
-  --       (setTypecheckerTracing defaultSettings)
-  --       (traverse inferType (fmap unLoc renamed.modDecls))
+
+-- void $
+--   assertRight
+--     =<< runTypeChecker
+--       emptyTypeCheckerEnvironment
+--       (setTypecheckerTracing defaultSettings)
+--       (traverse inferType (fmap unLoc renamed.modDecls))

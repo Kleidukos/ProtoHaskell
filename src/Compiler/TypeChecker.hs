@@ -62,6 +62,10 @@ runTypeChecker env settings action = do
     & runEff
 
 inferType :: PhDecl Name -> TypeChecker (PhDecl Name)
+inferType decl =
+  case decl of
+    Binding phBind 
+
 
 inferType' :: PhExpr Name -> TypeChecker TypedExpr
 inferType' phExpr = do
@@ -80,7 +84,9 @@ inferType' phExpr = do
 lookupTypeOfName :: Name -> TypeChecker (PhType Name)
 lookupTypeOfName name = do
   Environment{types} <- State.get
-  let result = Map.elems $ Map.filterWithKey (\tyName _ -> tyName.occ.nameFS == name.occ.nameFS) types
+  let result =
+        Map.elems $
+          Map.filterWithKey (\tyName _ -> tyName.occ.nameFS == name.occ.nameFS) types
    in case result of
         [associatedType] -> pure associatedType
         _ -> Error.throwError TypeNotFound
